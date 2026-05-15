@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(make:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)",
+      "Bash(pre-commit:*)",
+      "Bash(bash scripts/*)",
+      "Bash(./scripts/*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git restore:*)",
+      "Bash(git stash:*)",
+      "Bash(git switch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Write(src/**)",
+      "Write(tests/**)",
+      "Write(scripts/**)",
+      "Write(docs/**)",
+      "Edit(src/**)",
+      "Edit(tests/**)",
+      "Edit(scripts/**)",
+      "Edit(docs/ARCHITECTURE.md)",
+      "Edit(docs/DATA_MODEL.md)",
+      "Edit(docs/PIPELINE.md)",
+      "Edit(docs/build/PHASES.md)",
+      "Edit(docs/build/BUILD_LOG.md)",
+      "Edit(docs/build/DECISIONS.md)",
+      "Edit(pyproject.toml)",
+      "Edit(ruff.toml)",
+      "Edit(Makefile)",
+      "Edit(.pre-commit-config.yaml)",
+      "Edit(.github/workflows/*)",
+      "Edit(.claude/**)",
+      "Edit(CLAUDE.md)",
+      "Edit(AGENTS.md)",
+      "Edit(README.md)"
+    ],
+    "deny": [
+      "Bash(rm -rf /:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git reset --hard:*)",
+      "Edit(docs/build/FILE_PLAN.md)",
+      "Write(docs/build/FILE_PLAN.md)",
+      "Edit(docs/SPEC.md)",
+      "Write(docs/SPEC.md)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/stop_self_repair.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session_start_bootstrap.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

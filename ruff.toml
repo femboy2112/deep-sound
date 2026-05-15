@@ -1,0 +1,26 @@
+line-length = 100
+target-version = "py311"
+extend-exclude = [".build", ".venv", "dist", "build"]
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",  # line length handled by formatter
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["B", "SIM"]
+"scripts/**" = ["B"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
