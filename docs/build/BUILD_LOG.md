@@ -4,6 +4,22 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 0 chroma analyzer
+
+- **Agent:** Codex
+- **Scope:** Implement Phase 0 track-level chroma feature extraction.
+- **Rows touched:** P0-014, P0-019 → DONE.
+- **Changes:**
+  - Added a librosa-backed chroma analyzer returning a normalized 12-bin summary.
+  - Added focused chroma tests covering tonal input and silence.
+- **Verification:**
+  - `uv run pytest tests/test_chroma.py`
+  - `python3 scripts/verify.py`
+- **Notes:**
+  - `librosa.feature.chroma_stft` is called with `tuning=0.0` to avoid environment-dependent tuning estimation and keep Phase 0 deterministic.
+
+---
+
 ## 2026-05-19 — Codex harness and repo audit pass
 
 - **Agent:** Codex
