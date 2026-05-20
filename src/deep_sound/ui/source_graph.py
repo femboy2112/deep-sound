@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from deep_sound.domain.source import SourceType
 from deep_sound.services.source_service import SourceGraph
+from deep_sound.ui.library_workflow import SearchIntentDTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +76,14 @@ class SourceDetailData:
     correction_id: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class SourceGraphSelectionData:
+    selected_node_id: str
+    detail: SourceDetailData | None
+    correction_enabled: bool
+    compatible_search_actions: tuple[SearchIntentDTO, ...] = ()
+
+
 def source_detail_data(node: SourceGraphNodeData) -> SourceDetailData | None:
     if node.source_type is None:
         return None
@@ -88,6 +97,26 @@ def source_detail_data(node: SourceGraphNodeData) -> SourceDetailData | None:
         raw_source_type=node.raw_source_type,
         compatible_search_modes=node.compatible_search_modes,
         correction_id=node.correction_id,
+    )
+
+
+def source_graph_selection(
+    nodes: list[SourceGraphNodeData],
+    selected_node_id: str,
+) -> SourceGraphSelectionData:
+    node = next((candidate for candidate in nodes if candidate.node_id == selected_node_id), None)
+    if node is None:
+        raise KeyError(f"Source graph node not found: {selected_node_id}")
+    detail = source_detail_data(node)
+    return SourceGraphSelectionData(
+        selected_node_id=selected_node_id,
+        detail=detail,
+        correction_enabled=detail is not None,
+        compatible_search_actions=tuple(
+            SearchIntentDTO(query_id=selected_node_id, mode=mode)
+            for mode in node.compatible_search_modes
+            if node.search_enabled
+        ),
     )
 
 

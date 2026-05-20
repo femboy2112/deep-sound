@@ -83,5 +83,9 @@ def create_desktop_app_window(
 
     app = QApplication.instance() or QApplication(list(argv))
     bootstrap = bootstrap_desktop_app(config)
-    window = create_main_window(bootstrap.store.list_tracks())
+    window = create_main_window(
+        bootstrap.store.list_tracks(),
+        controller=bootstrap.controller,
+        active_profile=config.active_profile,
+    )
     return DesktopAppWindow(app=app, window=window, bootstrap=bootstrap)

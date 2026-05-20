@@ -4,6 +4,37 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 9 interactive desktop beta hardening
+
+- **Agent:** Codex
+- **Scope:** Wire interactive desktop beta actions and harden clip/query/result/source UI seams while keeping default verification dependency-light.
+- **Rows touched:** P9-004, P9-006 .. P9-015 → DONE.
+- **Changes:**
+  - Added controller-backed main-window action binding for import, analyze, index, refresh, selected-track search, and row selection.
+  - Added richer desktop workflow progress stage DTOs and retry action metadata for import/analyze/index/waveform/feedback jobs.
+  - Added selected-track detail data with waveform panel and clip selection state.
+  - Added `ClipAnalysisService` to materialize clip-owned rhythm, harmony, and timbre feature views under app data without modifying original audio.
+  - Added interactive query validation, result preview/compare/feedback actions, and source graph selection/correction/source-search actions.
+  - Added optional PySide smoke coverage that skips when `[ui]` is unavailable.
+  - Refreshed manual QA, README status, and repo audit for Phase 9.
+- **Verification:**
+  - `uv run pytest tests/test_phase9_main_window_actions.py tests/test_phase8_ui_models.py tests/test_phase9_desktop_app.py`
+  - `uv run pytest tests/test_phase9_job_progress.py tests/test_phase8_desktop_controller.py tests/test_phase9_acceptance_controller.py`
+  - `uv run pytest tests/test_phase9_track_detail.py tests/test_phase8_waveform_panel.py`
+  - `uv run pytest tests/test_phase9_clip_analysis.py`
+  - `uv run pytest tests/test_phase9_query_builder.py tests/test_phase8_ui_models.py`
+  - `uv run pytest tests/test_phase9_results_view.py tests/test_phase8_result_cards.py`
+  - `uv run pytest tests/test_phase9_source_graph.py tests/test_phase8_source_detail.py`
+  - `uv run pytest tests/test_phase9_optional_pyside_smoke.py`
+  - `python3 scripts/verify.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/toolset_review.py`
+- **Notes:**
+  - Optional PySide smoke skipped in this environment because the `[ui]` extra is not installed.
+  - Core verification remains dependency-light and does not require FAISS, PySide, Demucs, learned embeddings, cloud services, installers, or heavy MIR extras.
+
+---
+
 ## 2026-05-20 — Phase 8 desktop beta workflow integration
 
 - **Agent:** Codex

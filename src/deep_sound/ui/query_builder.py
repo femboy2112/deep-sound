@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from deep_sound.domain.feature_view import FeatureType, OwnerType
 from deep_sound.domain.source import SourceType
 from deep_sound.services.similarity_service import SearchMode
+
+if TYPE_CHECKING:
+    from deep_sound.ui.library_workflow import SearchIntentDTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +83,8 @@ class DesktopQueryState:
     clip_start_sec: float | None = None
     clip_end_sec: float | None = None
     warnings: tuple[str, ...] = ()
+    search_enabled: bool = True
+    search_intent: SearchIntentDTO | None = None
 
 
 def desktop_query_state(
@@ -94,10 +100,29 @@ def desktop_query_state(
     mode = SearchMode(search_mode)
     current_weights = weights or QueryWeights()
     warnings: list[str] = []
+    search_enabled = True
+    if not query_owner_id:
+        warnings.append("Select a track, clip, or source before searching.")
+        search_enabled = False
     if query_owner_type is OwnerType.CLIP and (clip_start_sec is None or clip_end_sec is None):
         warnings.append("Clip query is missing a selected time window.")
+        search_enabled = False
+    elif (
+        query_owner_type is OwnerType.CLIP
+        and clip_start_sec is not None
+        and clip_end_sec is not None
+        and clip_end_sec <= clip_start_sec
+    ):
+        warnings.append("Clip query end must be after start.")
+        search_enabled = False
     if query_owner_type is OwnerType.SOURCE and not _source_mode_enabled(mode, source_type):
         warnings.append("Selected source type is not compatible with this search mode.")
+        search_enabled = False
+    search_intent: SearchIntentDTO | None = None
+    if search_enabled:
+        from deep_sound.ui.library_workflow import SearchIntentDTO
+
+        search_intent = SearchIntentDTO(query_id=query_owner_id, mode=mode.value)
     return DesktopQueryState(
         query_owner_id=query_owner_id,
         query_owner_type=query_owner_type,
@@ -107,6 +132,52 @@ def desktop_query_state(
         clip_start_sec=clip_start_sec,
         clip_end_sec=clip_end_sec,
         warnings=tuple(warnings),
+        search_enabled=search_enabled,
+        search_intent=search_intent,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class InteractiveQueryBuilderState:
+    selected_query_id: str | None
+    selected_owner_type: OwnerType
+    selected_search_mode: SearchMode
+    weights: QueryWeights
+    desktop_query: DesktopQueryState
+    validation_messages: tuple[str, ...]
+    can_search: bool
+
+
+def interactive_query_builder_state(
+    *,
+    selected_query_id: str | None,
+    selected_owner_type: OwnerType | str = OwnerType.TRACK,
+    selected_search_mode: SearchMode | str = SearchMode.WEIGHTED,
+    weights: QueryWeights | None = None,
+    source_type: SourceType | None = None,
+    clip_start_sec: float | None = None,
+    clip_end_sec: float | None = None,
+) -> InteractiveQueryBuilderState:
+    owner_type = OwnerType(selected_owner_type)
+    mode = SearchMode(selected_search_mode)
+    current_weights = weights or QueryWeights()
+    desktop_query = desktop_query_state(
+        query_owner_id=selected_query_id or "",
+        query_owner_type=owner_type,
+        search_mode=mode,
+        weights=current_weights,
+        source_type=source_type,
+        clip_start_sec=clip_start_sec,
+        clip_end_sec=clip_end_sec,
+    )
+    return InteractiveQueryBuilderState(
+        selected_query_id=selected_query_id,
+        selected_owner_type=owner_type,
+        selected_search_mode=mode,
+        weights=current_weights,
+        desktop_query=desktop_query,
+        validation_messages=desktop_query.warnings,
+        can_search=desktop_query.search_enabled,
     )
 
 

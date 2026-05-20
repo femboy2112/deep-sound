@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
@@ -28,6 +28,7 @@ from deep_sound.ui.query_builder import IndexStatusDTO, QueryWeights
 from deep_sound.ui.results_view import ResultCardData, confidence_warnings
 
 T = TypeVar("T")
+StageReporter = Callable[[str], JobRecord]
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +97,50 @@ class WorkflowJobDTO:
     progress: float
     error_message: str | None = None
     retry_enabled: bool = False
+    stage: str = "queued"
+    stage_label: str = "Queued"
+    progress_label: str = "0%"
+    retry_action: WorkflowRetryActionDTO | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowRetryActionDTO:
+    controller_method: str
+    label: str
+    intent_type: str
+    target_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowProgressStageDTO:
+    stage: str
+    label: str
+    progress: float
+
+
+_IMPORT_PROGRESS: dict[str, WorkflowProgressStageDTO] = {
+    "scanning": WorkflowProgressStageDTO("scanning", "Scanning import paths", 0.10),
+    "importing": WorkflowProgressStageDTO("importing", "Importing audio", 0.45),
+    "finalizing": WorkflowProgressStageDTO("finalizing", "Finalizing library", 0.90),
+}
+_ANALYZE_PROGRESS: dict[str, WorkflowProgressStageDTO] = {
+    "preparing": WorkflowProgressStageDTO("preparing", "Preparing analysis", 0.10),
+    "analyzing": WorkflowProgressStageDTO("analyzing", "Analyzing library", 0.55),
+    "summarizing": WorkflowProgressStageDTO("summarizing", "Summarizing results", 0.90),
+}
+_INDEX_PROGRESS: dict[str, WorkflowProgressStageDTO] = {
+    "preparing": WorkflowProgressStageDTO("preparing", "Preparing indexes", 0.10),
+    "indexing": WorkflowProgressStageDTO("indexing", "Building indexes", 0.60),
+    "validating": WorkflowProgressStageDTO("validating", "Validating indexes", 0.90),
+}
+_WAVEFORM_PROGRESS: dict[str, WorkflowProgressStageDTO] = {
+    "loading": WorkflowProgressStageDTO("loading", "Loading audio", 0.20),
+    "summarizing": WorkflowProgressStageDTO("summarizing", "Summarizing waveform", 0.70),
+    "caching": WorkflowProgressStageDTO("caching", "Caching waveform", 0.90),
+}
+_FEEDBACK_PROGRESS: dict[str, WorkflowProgressStageDTO] = {
+    "recording": WorkflowProgressStageDTO("recording", "Recording feedback", 0.75),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,9 +208,11 @@ class DesktopWorkflowController:
         return self._active_profile
 
     def import_paths(self, intent: ImportIntentDTO) -> WorkflowJobDTO:
-        def worker() -> int:
+        def worker(report: StageReporter) -> int:
             imported_count = 0
+            report("scanning")
             for path in intent.paths:
+                report("importing")
                 if path.expanduser().is_dir():
                     imported_count += len(
                         self._library.import_folder(path, recursive=intent.recursive)
@@ -173,21 +220,29 @@ class DesktopWorkflowController:
                 else:
                     self._library.import_file(path)
                     imported_count += 1
+            report("finalizing")
             return imported_count
 
         job = self._run_store_job(
             job_type="desktop_import",
             target_type="library",
             target_id="library",
+            progress_plan=_IMPORT_PROGRESS,
             worker=worker,
         )
         return job_dto(job)
 
+    def retry_import_paths(self, intent: ImportIntentDTO) -> WorkflowJobDTO:
+        return self.import_paths(intent)
+
     def analyze(self, intent: AnalyzeIntentDTO) -> WorkflowJobDTO:
         self.set_active_profile(intent.profile)
 
-        def worker() -> int:
+        def worker(report: StageReporter) -> int:
+            report("preparing")
+            report("analyzing")
             summary = self._analysis.analyze_library(profile=self._active_profile)
+            report("summarizing")
             if summary.failed_count:
                 raise RuntimeError(
                     f"{summary.failed_count} track(s) failed during {self._active_profile.value}"
@@ -198,44 +253,65 @@ class DesktopWorkflowController:
             job_type=f"desktop_analyze_{self._active_profile.value}",
             target_type="library",
             target_id="library",
+            progress_plan=_ANALYZE_PROGRESS,
             worker=worker,
         )
         return job_dto(job)
 
+    def retry_analyze(self, intent: AnalyzeIntentDTO) -> WorkflowJobDTO:
+        return self.analyze(intent)
+
     def build_index(self, intent: IndexIntentDTO) -> WorkflowJobDTO:
         self.set_active_profile(intent.profile)
 
-        def worker() -> int:
-            return len(self._index.build_profile(self._active_profile))
+        def worker(report: StageReporter) -> int:
+            report("preparing")
+            report("indexing")
+            count = len(self._index.build_profile(self._active_profile))
+            report("validating")
+            return count
 
         job = self._run_store_job(
             job_type=f"desktop_index_{self._active_profile.value}",
             target_type="library",
             target_id="library",
+            progress_plan=_INDEX_PROGRESS,
             worker=worker,
         )
         return job_dto(job)
 
+    def retry_build_index(self, intent: IndexIntentDTO) -> WorkflowJobDTO:
+        return self.build_index(intent)
+
     def build_waveform(self, intent: WaveformIntentDTO) -> tuple[WorkflowJobDTO, WaveformCacheDTO]:
         cache: WaveformCacheDTO | None = None
 
-        def worker() -> int:
+        def worker(report: StageReporter) -> int:
             nonlocal cache
+            report("loading")
             cache = self._waveforms.build_cache(
                 self._store.get_track(intent.track_id),
                 point_count=intent.point_count,
             )
+            report("summarizing")
+            report("caching")
             return len(cache.points)
 
         job = self._run_store_job(
             job_type="desktop_waveform",
             target_type="track",
             target_id=intent.track_id,
+            progress_plan=_WAVEFORM_PROGRESS,
             worker=worker,
         )
         if cache is None:
             raise RuntimeError("Waveform cache was not produced")
         return job_dto(job), cache
+
+    def retry_build_waveform(
+        self, intent: WaveformIntentDTO
+    ) -> tuple[WorkflowJobDTO, WaveformCacheDTO]:
+        return self.build_waveform(intent)
 
     def create_clip_selection(
         self,
@@ -285,7 +361,8 @@ class DesktopWorkflowController:
         )
 
     def submit_feedback(self, intent: FeedbackIntentDTO) -> WorkflowJobDTO:
-        def worker() -> int:
+        def worker(report: StageReporter) -> int:
+            report("recording")
             self._corrections.add_result_feedback(
                 query_owner_id=intent.query_owner_id,
                 result_owner_id=intent.result_owner_id,
@@ -297,6 +374,7 @@ class DesktopWorkflowController:
             job_type="desktop_feedback",
             target_type="query",
             target_id=intent.query_owner_id,
+            progress_plan=_FEEDBACK_PROGRESS,
             worker=worker,
         )
         return job_dto(job)
@@ -324,7 +402,8 @@ class DesktopWorkflowController:
         job_type: str,
         target_type: str,
         target_id: str,
-        worker: Callable[[], T],
+        progress_plan: Mapping[str, WorkflowProgressStageDTO],
+        worker: Callable[[StageReporter], T],
     ) -> JobRecord:
         job = self._store.create_job(
             job_type=job_type,
@@ -333,14 +412,26 @@ class DesktopWorkflowController:
             status="queued",
             progress=0.0,
         )
-        self._store.update_job(job.id, status="running", progress=0.05)
+        current_job = job
+
+        def report(stage: str) -> JobRecord:
+            nonlocal current_job
+            progress_stage = progress_plan[stage]
+            progress = max(current_job.progress, progress_stage.progress)
+            current_job = self._store.update_job(
+                job.id,
+                status="running",
+                progress=progress,
+            )
+            return current_job
+
         try:
-            worker()
+            worker(report)
         except Exception as exc:
             return self._store.update_job(
                 job.id,
                 status="failed",
-                progress=1.0,
+                progress=current_job.progress,
                 error_message=str(exc),
             )
         return self._store.update_job(job.id, status="completed", progress=1.0)
@@ -352,6 +443,8 @@ class DesktopWorkflowController:
 
 
 def job_dto(job: JobRecord) -> WorkflowJobDTO:
+    stage = _stage_for_job(job)
+    retry_action = _retry_action_for_job(job)
     return WorkflowJobDTO(
         job_id=job.id,
         job_type=job.job_type,
@@ -360,8 +453,76 @@ def job_dto(job: JobRecord) -> WorkflowJobDTO:
         status=job.status,
         progress=job.progress,
         error_message=job.error_message,
-        retry_enabled=job.status == "failed",
+        retry_enabled=retry_action is not None,
+        stage=stage.stage,
+        stage_label=stage.label,
+        progress_label=f"{job.progress:.0%}",
+        retry_action=retry_action,
     )
+
+
+def _stage_for_job(job: JobRecord) -> WorkflowProgressStageDTO:
+    if job.status == "queued":
+        return WorkflowProgressStageDTO("queued", "Queued", 0.0)
+    if job.status == "completed":
+        return WorkflowProgressStageDTO("completed", "Completed", 1.0)
+    if job.status == "failed":
+        return WorkflowProgressStageDTO("failed", "Failed", job.progress)
+
+    progress_plan = _progress_plan_for_job_type(job.job_type)
+    stage = WorkflowProgressStageDTO("running", "Running", job.progress)
+    for candidate in sorted(progress_plan.values(), key=lambda item: item.progress):
+        if job.progress >= candidate.progress:
+            stage = candidate
+    return stage
+
+
+def _progress_plan_for_job_type(job_type: str) -> Mapping[str, WorkflowProgressStageDTO]:
+    if job_type == "desktop_import":
+        return _IMPORT_PROGRESS
+    if job_type.startswith("desktop_analyze_") or job_type.startswith("analyze_"):
+        return _ANALYZE_PROGRESS
+    if job_type.startswith("desktop_index_") or job_type == "build_index":
+        return _INDEX_PROGRESS
+    if job_type == "desktop_waveform":
+        return _WAVEFORM_PROGRESS
+    if job_type == "desktop_feedback":
+        return _FEEDBACK_PROGRESS
+    return {}
+
+
+def _retry_action_for_job(job: JobRecord) -> WorkflowRetryActionDTO | None:
+    if job.status != "failed":
+        return None
+    if job.job_type == "desktop_import":
+        return WorkflowRetryActionDTO(
+            controller_method="retry_import_paths",
+            label="Retry import",
+            intent_type="ImportIntentDTO",
+            target_id=job.target_id,
+        )
+    if job.job_type.startswith("desktop_analyze_") or job.job_type.startswith("analyze_"):
+        return WorkflowRetryActionDTO(
+            controller_method="retry_analyze",
+            label="Retry analysis",
+            intent_type="AnalyzeIntentDTO",
+            target_id=job.target_id,
+        )
+    if job.job_type.startswith("desktop_index_") or job.job_type == "build_index":
+        return WorkflowRetryActionDTO(
+            controller_method="retry_build_index",
+            label="Retry index",
+            intent_type="IndexIntentDTO",
+            target_id=job.target_id,
+        )
+    if job.job_type == "desktop_waveform":
+        return WorkflowRetryActionDTO(
+            controller_method="retry_build_waveform",
+            label="Retry waveform",
+            intent_type="WaveformIntentDTO",
+            target_id=job.target_id,
+        )
+    return None
 
 
 def index_status_dto(status: IndexStatus) -> IndexStatusDTO:

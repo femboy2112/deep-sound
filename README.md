@@ -12,7 +12,7 @@ Repo-control-plane docs live in:
 
 ## Status
 
-This repository is in **Phase 8 desktop beta workflow integration**. Phase 7 completed the dependency-light CLI/service beta path; Phase 8 wires that path into import-safe desktop controller and UI DTO seams while keeping PySide optional for default verification.
+This repository is in **Phase 9 interactive desktop beta hardening**. Phase 8 completed the import-safe desktop controller seam; Phase 9 wires controller-backed PySide actions, selected-track waveform/clip state, clip-owned query features, and result/source action DTOs while keeping PySide optional for default verification.
 
 ## Quickstart
 

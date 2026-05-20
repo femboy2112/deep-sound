@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from deep_sound.domain.corrections import ResultFeedbackValue
+
+if TYPE_CHECKING:
+    from deep_sound.ui.library_workflow import FeedbackIntentDTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +57,68 @@ def result_feedback_action(card: ResultCardData) -> ResultFeedbackActionData | N
     return ResultFeedbackActionData(
         query_owner_id=card.query_owner_id,
         result_owner_id=card.result_owner_id,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ResultPreviewActionData:
+    result_owner_id: str
+    matched_entity_type: str | None
+    matched_range: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ResultCompareActionData:
+    query_owner_id: str
+    result_owner_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ResultCardActionSet:
+    preview: ResultPreviewActionData | None
+    compare: ResultCompareActionData | None
+    relevant_feedback: FeedbackIntentDTO | None
+    irrelevant_feedback: FeedbackIntentDTO | None
+
+
+def result_card_actions(card: ResultCardData) -> ResultCardActionSet:
+    preview = (
+        None
+        if card.result_owner_id is None
+        else ResultPreviewActionData(
+            result_owner_id=card.result_owner_id,
+            matched_entity_type=card.matched_entity_type,
+            matched_range=card.matched_range,
+        )
+    )
+    compare = (
+        None
+        if card.query_owner_id is None or card.result_owner_id is None
+        else ResultCompareActionData(
+            query_owner_id=card.query_owner_id,
+            result_owner_id=card.result_owner_id,
+        )
+    )
+    return ResultCardActionSet(
+        preview=preview,
+        compare=compare,
+        relevant_feedback=_feedback_intent(card, ResultFeedbackValue.RELEVANT),
+        irrelevant_feedback=_feedback_intent(card, ResultFeedbackValue.IRRELEVANT),
+    )
+
+
+def _feedback_intent(
+    card: ResultCardData,
+    value: ResultFeedbackValue,
+) -> FeedbackIntentDTO | None:
+    if card.query_owner_id is None or card.result_owner_id is None:
+        return None
+    from deep_sound.ui.library_workflow import FeedbackIntentDTO
+
+    return FeedbackIntentDTO(
+        query_owner_id=card.query_owner_id,
+        result_owner_id=card.result_owner_id,
+        value=value,
     )
 
 

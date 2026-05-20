@@ -8,6 +8,13 @@ from dataclasses import dataclass
 from deep_sound.domain.feature_view import FeatureView
 from deep_sound.domain.track import Track
 from deep_sound.infra.storage.sqlite_store import SectionRecord, SourceActivityRecord
+from deep_sound.services.waveform_service import ClipWindowDTO, WaveformCacheDTO
+from deep_sound.ui.waveform_panel import (
+    ClipSelectionState,
+    WaveformPanelData,
+    create_waveform_panel,
+    waveform_panel_data,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +22,45 @@ class FeatureSummaryRow:
     feature_type: str
     algorithm: str
     confidence: str
+
+
+@dataclass(frozen=True, slots=True)
+class TrackDetailData:
+    track_id: str
+    title: str
+    analysis_status: str
+    duration: str
+    waveform: WaveformPanelData | None = None
+    selected_clip: ClipSelectionState | None = None
+    feature_summaries: tuple[FeatureSummaryRow, ...] = ()
+
+
+def track_detail_data(
+    track: Track,
+    *,
+    waveform_cache: WaveformCacheDTO | None = None,
+    selected_clip: ClipSelectionState | None = None,
+    persisted_clips: tuple[ClipWindowDTO, ...] = (),
+    features: Sequence[FeatureView] = (),
+) -> TrackDetailData:
+    waveform = (
+        None
+        if waveform_cache is None
+        else waveform_panel_data(
+            waveform_cache,
+            selected_clip=selected_clip,
+            persisted_clips=persisted_clips,
+        )
+    )
+    return TrackDetailData(
+        track_id=track.id,
+        title=track.title or track.filepath.stem,
+        analysis_status=track.analysis_status,
+        duration=_format_duration(track.duration_sec),
+        waveform=waveform,
+        selected_clip=selected_clip,
+        feature_summaries=tuple(feature_summary_rows(features)),
+    )
 
 
 def feature_summary_rows(features: Sequence[FeatureView]) -> list[FeatureSummaryRow]:
@@ -35,6 +81,7 @@ def create_track_detail_widget(
     sections: Sequence[SectionRecord] = (),
     source_activity: Sequence[SourceActivityRecord] = (),
     features: Sequence[FeatureView] = (),
+    waveform: WaveformPanelData | None = None,
 ) -> object:
     """Create a PySide track-detail widget from service-level DTOs."""
     try:
@@ -44,7 +91,6 @@ def create_track_detail_widget(
             QLabel,
             QListWidget,
             QPushButton,
-            QSlider,
             QTableWidget,
             QTableWidgetItem,
             QVBoxLayout,
@@ -67,9 +113,10 @@ def create_track_detail_widget(
     controls.addWidget(QPushButton("Reanalyze"))
     layout.addLayout(controls)
 
-    waveform = QSlider()
-    waveform.setRange(0, int(track.duration_sec or 0))
-    layout.addWidget(waveform)
+    if waveform is None:
+        layout.addWidget(QLabel("Waveform cache unavailable"))
+    else:
+        layout.addWidget(create_waveform_panel(waveform))
 
     section_box = QGroupBox("Sections")
     section_list = QListWidget()
@@ -102,3 +149,11 @@ def create_track_detail_widget(
             table.setItem(index, column, QTableWidgetItem(value))
     layout.addWidget(table)
     return root
+
+
+def _format_duration(duration_sec: float | None) -> str:
+    if duration_sec is None:
+        return "-"
+    total = max(0, round(duration_sec))
+    minutes, seconds = divmod(total, 60)
+    return f"{minutes}:{seconds:02d}"
