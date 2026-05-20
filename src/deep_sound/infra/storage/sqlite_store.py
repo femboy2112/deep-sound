@@ -170,9 +170,10 @@ class SqliteStore:
             conn.execute(
                 """
                 INSERT INTO stems (
-                    id, track_id, stem_type, artifact_path, model_name, model_version, confidence
+                    id, track_id, stem_type, artifact_path, model_name, model_version,
+                    params_hash, input_hash, confidence
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     stem.id,
@@ -181,6 +182,8 @@ class SqliteStore:
                     None if stem.artifact_path is None else str(stem.artifact_path),
                     stem.model_name,
                     stem.model_version,
+                    stem.params_hash,
+                    stem.input_hash,
                     stem.confidence.value,
                 ),
             )
@@ -488,6 +491,8 @@ def _stem_from_row(row: sqlite3.Row) -> Stem:
         artifact_path=None if artifact_path is None else Path(artifact_path),
         model_name=_optional_str(row["model_name"]),
         model_version=_optional_str(row["model_version"]),
+        params_hash=_optional_str(_row_value(row, "params_hash")),
+        input_hash=_optional_str(_row_value(row, "input_hash")),
         confidence=Confidence(float(row["confidence"])),
     )
 
@@ -599,6 +604,10 @@ def _optional_str(value: object) -> str | None:
     return None if value is None else str(value)
 
 
+def _row_value(row: sqlite3.Row, key: str) -> object | None:
+    return dict(row).get(key)
+
+
 def _optional_float(value: object) -> float | None:
     if value is None:
         return None
@@ -665,6 +674,8 @@ CREATE TABLE IF NOT EXISTS stems (
     artifact_path TEXT,
     model_name TEXT,
     model_version TEXT,
+    params_hash TEXT,
+    input_hash TEXT,
     confidence REAL NOT NULL CHECK (confidence >= 0.0 AND confidence <= 1.0)
 );
 

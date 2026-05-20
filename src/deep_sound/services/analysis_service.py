@@ -5,11 +5,16 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
+from deep_sound.domain.stem import Stem, StemType
 from deep_sound.domain.track import Track
+from deep_sound.infra.analyzers.bass_stem import summarize_bass_stem
 from deep_sound.infra.analyzers.chroma_librosa import summarize_chroma
+from deep_sound.infra.analyzers.drum_stem import summarize_drum_stem
 from deep_sound.infra.analyzers.mfcc_librosa import summarize_mfcc
+from deep_sound.infra.analyzers.other_stem import summarize_other_stem
 from deep_sound.infra.analyzers.tempo_librosa import DEFAULT_SAMPLE_RATE, estimate_tempo
 from deep_sound.infra.storage.sqlite_store import SqliteStore
+from deep_sound.services.source_service import SourceService
 
 ProgressCallback = Callable[[str, float], None]
 
@@ -85,6 +90,91 @@ class AnalysisService:
         self._emit_progress("timbre.mfcc_stats", 1.0)
 
         return [rhythm, harmony, timbre]
+
+    def separate_stems(self, track: Track, source_service: SourceService) -> list[Stem]:
+        """Run broad-stem separation through SourceService and persist stems."""
+        self._emit_progress("separate_stems.started", 0.0)
+        stems = source_service.separate_broad_stems(track)
+        self._emit_progress("separate_stems.completed", 1.0)
+        return stems
+
+    def analyze_stem(self, stem: Stem) -> list[FeatureView]:
+        """Extract conservative Phase 2 feature views for a broad stem."""
+        if stem.artifact_path is None:
+            raise ValueError(f"Stem {stem.id} has no artifact_path")
+        views: list[FeatureView] = []
+        if stem.stem_type is StemType.DRUMS:
+            drum_summary = summarize_drum_stem(stem.artifact_path, sample_rate=self._sample_rate)
+            views.append(
+                FeatureView(
+                    id=f"{stem.id}:rhythm.drum",
+                    owner_type=OwnerType.STEM,
+                    owner_id=stem.id,
+                    feature_type=FeatureType.RHYTHM_DRUM,
+                    algorithm=drum_summary.analyzer,
+                    algorithm_version=drum_summary.analyzer_version,
+                    params_hash=f"sample_rate={self._sample_rate}",
+                    stats={
+                        "groove_regularity": drum_summary.groove_regularity,
+                        "onset_density": drum_summary.onset_density,
+                        "spectral_centroid": drum_summary.spectral_centroid,
+                    },
+                    confidence=drum_summary.confidence,
+                )
+            )
+        elif stem.stem_type is StemType.BASS:
+            bass_summary = summarize_bass_stem(stem.artifact_path, sample_rate=self._sample_rate)
+            views.append(
+                FeatureView(
+                    id=f"{stem.id}:bass.root_motion",
+                    owner_type=OwnerType.STEM,
+                    owner_id=stem.id,
+                    feature_type=FeatureType.BASS_ROOT_MOTION,
+                    algorithm=bass_summary.analyzer,
+                    algorithm_version=bass_summary.analyzer_version,
+                    params_hash=f"sample_rate={self._sample_rate}",
+                    stats={
+                        "low_energy_ratio": bass_summary.low_energy_ratio,
+                        "pitch_motion": bass_summary.pitch_motion,
+                        "root_stability": bass_summary.root_stability,
+                    },
+                    confidence=bass_summary.confidence,
+                )
+            )
+        elif stem.stem_type is StemType.OTHER:
+            other_summary = summarize_other_stem(stem.artifact_path, sample_rate=self._sample_rate)
+            views.extend(
+                [
+                    FeatureView(
+                        id=f"{stem.id}:harmony.chroma",
+                        owner_type=OwnerType.STEM,
+                        owner_id=stem.id,
+                        feature_type=FeatureType.HARMONY_CHROMA,
+                        algorithm=other_summary.analyzer,
+                        algorithm_version=other_summary.analyzer_version,
+                        params_hash=f"sample_rate={self._sample_rate}",
+                        stats=_vector_stats("chroma", other_summary.chroma),
+                        confidence=other_summary.confidence,
+                    ),
+                    FeatureView(
+                        id=f"{stem.id}:timbre.mfcc_stats",
+                        owner_type=OwnerType.STEM,
+                        owner_id=stem.id,
+                        feature_type=FeatureType.TIMBRE_MFCC_STATS,
+                        algorithm=other_summary.analyzer,
+                        algorithm_version=other_summary.analyzer_version,
+                        params_hash=f"sample_rate={self._sample_rate}",
+                        stats=_vector_stats("mfcc", other_summary.mfcc),
+                        confidence=other_summary.confidence,
+                    ),
+                ]
+            )
+        else:
+            return []
+
+        for view in views:
+            self._store.add_feature_view(view)
+        return views
 
     def _emit_progress(self, stage: str, progress: float) -> None:
         if self._progress_callback is not None:

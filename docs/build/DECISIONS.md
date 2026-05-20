@@ -50,3 +50,9 @@ The override does not relax product-spec rules, phase ceilings, or the `FILE_PLA
 The new `scripts/toolset_review.py` surface is intentionally non-mutating. It may inspect repo state, verify output, and repair-attempt signals, then write recommendations to `.build/toolset_review.{json,md}`.
 
 It must not auto-edit `.codex/`, `.claude/`, `docs/`, or source files. A human or later agent decides whether to apply any recommendation.
+
+## 2026-05-20 — Phase 2 dependency-light stem path
+
+Phase 2 keeps Demucs optional behind the `[demucs]` extra. Core verification uses a deterministic fake broad-stem provider that writes vocals, drums, bass, and other artifacts under app data while preserving original audio bytes.
+
+The Phase 2 analyzers intentionally emit broad-stem proxy features only. Drum output is rhythm/timbre evidence, bass output is root-motion evidence, and other/accompaniment output is chroma/timbre evidence. Source-specific chord claims, instrument-specific harmony, and correction learning remain Phase 3+ work.

@@ -43,6 +43,12 @@ class ExplanationService:
         parts.append(
             f"The strongest evidence is {strongest_name} similarity at {strongest_score:.2f}."
         )
+        if isinstance(result, SimilarityResult) and result.matched_stem is not None:
+            parts.append(
+                f"The matched stem is {result.matched_stem}; treat stem identity as probabilistic."
+            )
+        if isinstance(result, SimilarityResult) and result.matched_range is not None:
+            parts.append(f"The matched range is {result.matched_range}.")
         if len(ranked_scores) > 1:
             supporting = ", ".join(f"{name} {score:.2f}" for name, score in ranked_scores[1:3])
             parts.append(f"Other observed dimensions are {supporting}.")
@@ -55,4 +61,6 @@ class ExplanationService:
             )
         else:
             parts.append("This is similarity evidence, not a definitive identification.")
+        if isinstance(result, SimilarityResult) and result.caveats:
+            parts.append(" ".join(result.caveats))
         return " ".join(parts)

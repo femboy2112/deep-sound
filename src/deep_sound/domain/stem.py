@@ -31,3 +31,5 @@ class Stem:
     artifact_path: Path | None = None
     model_name: str | None = None
     model_version: str | None = None
+    params_hash: str | None = None
+    input_hash: str | None = None

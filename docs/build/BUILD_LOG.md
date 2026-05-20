@@ -4,6 +4,29 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 2 broad stem analysis
+
+- **Agent:** Codex
+- **Scope:** Promote Phase 2 and implement dependency-light broad stem analysis plus Phase 3-safe UI/search hooks.
+- **Rows touched:** P2-001 .. P2-012.
+- **Changes:**
+  - Added safe `scripts/update_plan.py --add-row` support and used it to create the Phase 2 backlog.
+  - Promoted `ACTIVE_PHASE` to 2.
+  - Added optional Demucs provider boundary plus deterministic fake broad-stem provider for core tests.
+  - Persisted broad-stem provenance fields and added SourceService source graph APIs.
+  - Added conservative drum, bass, and other-stem analyzers with confidence-bounded outputs.
+  - Extended AnalysisService, stem-level search metadata, cautious explanations, and import-safe source graph UI DTOs.
+- **Verification:**
+  - `uv run pytest tests/test_update_plan.py`
+  - `uv run pytest tests/test_demucs_provider.py tests/test_source_service.py tests/test_analysis_service.py tests/test_drum_features.py tests/test_bass_features.py tests/test_stem_harmony.py tests/test_stem_search.py tests/test_source_graph_ui.py tests/test_explanation_service.py tests/test_sqlite_store.py`
+  - `uv run ruff check .`
+  - `uv run ruff format --check .`
+  - `uv run mypy src/deep_sound`
+  - `uv run pytest`
+- **Notes:**
+  - A real Demucs smoke was not run because core verification does not require the heavy `[demucs]` extra.
+  - Phase 3 source-specific chord analysis remains intentionally disabled/deferred.
+
 ## 2026-05-20 — Phase 1 desktop MVP backbone
 
 - **Agent:** Codex

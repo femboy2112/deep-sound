@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from enum import StrEnum
 
-from deep_sound.domain.feature_view import FeatureType
+from deep_sound.domain.feature_view import FeatureType, OwnerType
 from deep_sound.services.feature_service import FeatureService
 
 
@@ -34,6 +34,10 @@ class SimilarityResult:
     owner_id: str
     score: float
     dimension_scores: dict[str, float]
+    owner_type: OwnerType = OwnerType.TRACK
+    matched_stem: str | None = None
+    matched_range: str | None = None
+    caveats: tuple[str, ...] = ()
 
 
 class SimilarityService:
@@ -43,7 +47,11 @@ class SimilarityService:
         self._features = features
 
     def search(
-        self, query_id: str, weights: dict[str, float], top_k: int = 10
+        self,
+        query_id: str,
+        weights: dict[str, float],
+        top_k: int = 10,
+        owner_type: OwnerType | None = None,
     ) -> list[SimilarityResult]:
         """Rank feature owners against `query_id`.
 
@@ -55,12 +63,16 @@ class SimilarityService:
         if not query_views:
             raise KeyError(f"No features found for query owner: {query_id}")
 
-        candidate_ids = {
-            view.owner_id
-            for feature_type in normalized_weights
-            for view in self._features.list_by_type(feature_type)
-            if view.owner_id != query_id
-        }
+        candidate_ids: set[str] = set()
+        candidate_owner_types: dict[str, OwnerType] = {}
+        for feature_type in normalized_weights:
+            for view in self._features.list_by_type(feature_type):
+                if view.owner_id == query_id:
+                    continue
+                if owner_type is not None and view.owner_type is not owner_type:
+                    continue
+                candidate_ids.add(view.owner_id)
+                candidate_owner_types[view.owner_id] = view.owner_type
 
         results: list[SimilarityResult] = []
         for candidate_id in sorted(candidate_ids):
@@ -81,6 +93,16 @@ class SimilarityService:
                     owner_id=candidate_id,
                     score=weighted_total / weight_total,
                     dimension_scores=dimension_scores,
+                    owner_type=candidate_owner_types.get(candidate_id, OwnerType.TRACK),
+                    matched_stem=candidate_id
+                    if candidate_owner_types.get(candidate_id) is OwnerType.STEM
+                    else None,
+                    matched_range="full stem"
+                    if candidate_owner_types.get(candidate_id) is OwnerType.STEM
+                    else None,
+                    caveats=("Stem-level match is probabilistic.",)
+                    if candidate_owner_types.get(candidate_id) is OwnerType.STEM
+                    else (),
                 )
             )
 
@@ -96,6 +118,19 @@ class SimilarityService:
             query_id=query_id,
             weights={feature_type.value: 1.0 for feature_type in MODE_FEATURE_TYPES[mode]},
             top_k=top_k,
+        )
+
+    def search_stems(
+        self,
+        query_id: str,
+        weights: dict[str, float],
+        top_k: int = 10,
+    ) -> list[SimilarityResult]:
+        return self.search(
+            query_id=query_id,
+            weights=weights,
+            top_k=top_k,
+            owner_type=OwnerType.STEM,
         )
 
     def _score_dimension(
