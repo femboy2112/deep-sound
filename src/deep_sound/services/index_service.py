@@ -44,6 +44,21 @@ INDEX_PROFILE_FEATURES: dict[AnalysisProfile, tuple[tuple[OwnerType, FeatureType
         (OwnerType.SOURCE, FeatureType.MELODY_CONTOUR),
         (OwnerType.SOURCE, FeatureType.TIMBRE_EMBEDDING),
     ),
+    AnalysisProfile.SOURCE_AWARE_REAL: (
+        (OwnerType.TRACK, FeatureType.RHYTHM_GLOBAL),
+        (OwnerType.TRACK, FeatureType.HARMONY_CHROMA),
+        (OwnerType.TRACK, FeatureType.TIMBRE_MFCC_STATS),
+        (OwnerType.TRACK, FeatureType.PRODUCTION_TEXTURE),
+        (OwnerType.TRACK, FeatureType.STRUCTURE_SECTION_SEQUENCE),
+        (OwnerType.STEM, FeatureType.RHYTHM_DRUM),
+        (OwnerType.STEM, FeatureType.BASS_ROOT_MOTION),
+        (OwnerType.STEM, FeatureType.HARMONY_CHROMA),
+        (OwnerType.STEM, FeatureType.TIMBRE_MFCC_STATS),
+        (OwnerType.SOURCE, FeatureType.HARMONY_CHORD_SEQUENCE),
+        (OwnerType.SOURCE, FeatureType.HARMONY_CHORD_CHANGE),
+        (OwnerType.SOURCE, FeatureType.MELODY_CONTOUR),
+        (OwnerType.SOURCE, FeatureType.TIMBRE_EMBEDDING),
+    ),
 }
 
 

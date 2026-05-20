@@ -96,3 +96,11 @@ Phase 8 promotes the Phase 7 CLI/service beta into an import-safe desktop workfl
 Default verification remains dependency-light. PySide imports stay inside widget factories, and optional PySide smoke tests must skip when `[ui]` is not installed. Phase 8 does not add packaging, installers, cloud services, production Demucs quality work, or learned embeddings.
 
 Result and source UI language remains probabilistic. Similarity dimension scores are similarity evidence, not analyzer confidence, and stale/missing-index caveats must stay visible in result inspection.
+
+## 2026-05-20 — Phase 10 real-source smoke boundary
+
+Phase 10 adds an explicit real-source smoke path without changing the default source-aware profile. `source_aware` remains the dependency-light fake-provider route used by default verification. `source_aware_real` is the only profile that constructs a `DemucsProvider`.
+
+Missing Demucs is treated as a clear opt-in failure for `source_aware_real`, not as a reason for default `python3 scripts/verify.py` to fail. Optional real-Demucs smoke tests skip unless a Demucs executable and local audio fixture are intentionally provided.
+
+Real separated stems must be copied under app data, original audio files must remain unchanged, and stem records must persist algorithm, model, params hash, and input hash provenance before downstream stem/source analyzers run.

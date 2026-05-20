@@ -86,7 +86,18 @@ class DemucsProvider(SeparationProvider):
         self.model_version = model_version
         self._executable = executable
 
+    def is_available(self) -> bool:
+        return shutil.which(self._executable) is not None
+
     def separate(self, input_path: Path, output_dir: Path) -> list[SeparationArtifact]:
+        if not input_path.exists():
+            raise FileNotFoundError(f"Input audio file does not exist: {input_path}")
+        if not self.is_available():
+            raise RuntimeError(
+                "source_aware_real requires the optional Demucs executable; "
+                "install the [demucs] extra or use profile source_aware for the "
+                "dependency-light fake-provider path."
+            )
         input_hash = file_sha256(input_path)
         params_hash = params_sha256(
             {"provider": self.algorithm, "model": self.model_version, "stems": "4"}
@@ -107,7 +118,8 @@ class DemucsProvider(SeparationProvider):
             subprocess.run(command, check=True, capture_output=True, text=True)
         except FileNotFoundError as exc:
             raise RuntimeError(
-                "Demucs executable is not available; install the [demucs] extra."
+                "source_aware_real requires the optional Demucs executable; "
+                "install the [demucs] extra or use profile source_aware."
             ) from exc
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.strip() if exc.stderr else "no stderr"
@@ -117,10 +129,14 @@ class DemucsProvider(SeparationProvider):
         artifacts: list[SeparationArtifact] = []
         for stem_type in BROAD_STEM_TYPES:
             produced = produced_dir / f"{stem_type.value}.wav"
-            if not produced.exists():
+            if not produced.is_file():
                 raise RuntimeError(f"Demucs did not produce expected stem: {produced}")
+            if produced.stat().st_size <= 0:
+                raise RuntimeError(f"Demucs produced an empty stem artifact: {produced}")
             artifact_path = output_dir / f"{stem_type.value}.wav"
             shutil.copyfile(produced, artifact_path)
+            if not artifact_path.is_relative_to(output_dir):
+                raise RuntimeError(f"Refusing Demucs stem outside app data: {artifact_path}")
             artifacts.append(
                 SeparationArtifact(
                     stem_type=stem_type,

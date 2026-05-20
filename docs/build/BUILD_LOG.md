@@ -4,6 +4,29 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 10 optional real-source smoke
+
+- **Agent:** Codex
+- **Scope:** Open Phase 10 and add an explicit Demucs-backed smoke path while preserving dependency-light defaults.
+- **Rows touched:** P10-001 .. P10-010 → DONE.
+- **Changes:**
+  - Added Phase 10 plan rows through `scripts/update_plan.py` and promoted `ACTIVE_PHASE` to 10.
+  - Added `source_aware_real` as the explicit Demucs-backed analysis profile; existing `source_aware` remains fake-provider based.
+  - Hardened `DemucsProvider` availability checks, missing/empty stem validation, and opt-in error messages.
+  - Exposed `analyze-library --profile source_aware_real` plus `--demucs-executable` for local smoke tests.
+  - Added dependency-light fake-Demucs tests for provider contract, CLI routing, artifact safety, and optional smoke skip behavior.
+  - Refreshed manual QA, README, repo audit, and decision docs for the real-source boundary.
+- **Verification:**
+  - `uv run pytest tests/test_demucs_provider.py tests/test_phase10_demucs_provider_contract.py tests/test_phase10_source_aware_real_profile.py tests/test_phase10_cli_real_source.py tests/test_phase10_source_artifact_safety.py tests/test_phase10_optional_demucs_smoke.py tests/test_phase7_source_aware_profile.py tests/test_phase7_cli_profiles.py`
+  - `python3 scripts/verify.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/toolset_review.py`
+- **Notes:**
+  - Optional real Demucs smoke skipped by default unless `DEEP_SOUND_RUN_DEMUCS_SMOKE=1`, a Demucs executable, and `DEEP_SOUND_DEMUCS_SMOKE_AUDIO` are supplied.
+  - Default verification still does not require Demucs, PySide, FAISS, learned embeddings, cloud services, installers, or heavy MIR extras.
+
+---
+
 ## 2026-05-20 — Phase 9 interactive desktop beta hardening
 
 - **Agent:** Codex

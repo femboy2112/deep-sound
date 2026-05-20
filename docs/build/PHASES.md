@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 9
+**ACTIVE_PHASE:** 10
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -167,3 +167,22 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - Keep PySide smoke tests optional and skipped unless `[ui]` is installed.
 
 **FILE_PLAN ids:** `P9-001` .. `P9-0NN`.
+
+---
+
+## Phase 10 — Optional Real Source-Aware Smoke
+
+**Goal:** Prove the source-aware pipeline can run against real Demucs-separated stems when optional dependencies are installed, without changing the dependency-light default gate.
+
+**Required capabilities:**
+- Keep `source_aware` on the deterministic fake-provider path for core tests and default CLI/controller usage.
+- Add explicit `source_aware_real` analysis routing backed by `DemucsProvider`.
+- Fail with a clear opt-in error when `source_aware_real` is selected without a Demucs executable.
+- Persist real stem artifacts under `app_data/`, preserve original audio bytes, and retain algorithm/model/params/input provenance on stem rows.
+- Keep optional real-Demucs smoke coverage skipped unless the Demucs executable and a local fixture are provided intentionally.
+
+**Exit criteria:**
+- `python3 scripts/verify.py` remains green without Demucs, PySide, FAISS, learned embeddings, cloud services, or heavy MIR extras.
+- Focused Phase 10 tests cover missing-Demucs errors, fake-provider compatibility, real-provider routing through a fake executable, artifact placement, and optional smoke skip behavior.
+
+**FILE_PLAN ids:** `P10-001` .. `P10-0NN`.

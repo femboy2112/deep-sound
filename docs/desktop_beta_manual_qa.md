@@ -1,12 +1,12 @@
 # Desktop Beta Manual QA
 
-Use this checklist for Phase 9 local desktop beta QA. Default automated verification stays dependency-light; PySide checks are manual or skipped unless the `[ui]` extra is installed.
+Use this checklist for Phase 10 local desktop beta QA. Default automated verification stays dependency-light; PySide and real-Demucs checks are manual or skipped unless the optional extras are installed intentionally.
 
 ## Setup
 
 1. Prepare a tiny local audio folder with at least two valid audio files and one intentionally broken `.wav` text file.
 2. Run `make bootstrap` if dependencies are missing.
-3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 9`.
+3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 10`.
 4. Use a fresh library database, for example `/tmp/deep-sound-desktop-beta.sqlite`, and an app data directory under `/tmp/deep-sound-desktop-beta-data`.
 
 ## Service Workflow
@@ -32,11 +32,30 @@ Only run this section after installing the `[ui]` extra.
 6. Inspect the source graph and confirm source detail, correction controls, and compatible source-search actions are exposed only for compatible source types.
 7. Confirm source, chord, event, and result language remains caveated/probabilistic and no result is presented as a definitive match.
 
+## Optional Real-Source Smoke
+
+Only run this section after intentionally installing the `[demucs]` extra or otherwise making the `demucs` executable available.
+
+1. Prepare one tiny local audio fixture and confirm it is safe to copy into temporary app data.
+2. Run `DEEP_SOUND_RUN_DEMUCS_SMOKE=1 DEEP_SOUND_DEMUCS_SMOKE_AUDIO=/path/to/tiny.wav uv run pytest tests/test_phase10_optional_demucs_smoke.py`.
+3. Run the CLI opt-in path:
+
+   ```bash
+   uv run deep-sound analyze-library \
+     --library-db /tmp/deep-sound-real-source.sqlite \
+     --import-path /path/to/tiny.wav \
+     --profile source_aware_real \
+     --app-data-dir /tmp/deep-sound-real-source-data
+   ```
+
+4. Confirm stems are written below `/tmp/deep-sound-real-source-data/stems/`, original audio bytes are unchanged, and persisted stem metadata reports `demucs` with model/version/params/input provenance.
+5. Run the same command with an intentionally missing `--demucs-executable` and confirm the CLI fails with a clear `source_aware_real` opt-in error.
+
 ## Known Gaps
 
 - Playback transport controls are still UI placeholders.
 - Default verification does not exercise a real installed PySide session unless `[ui]` is installed locally.
-- Source-aware QA still uses fake-provider source paths unless the optional Demucs extra is installed intentionally.
+- Default `source_aware` QA still uses fake-provider source paths. Real separation QA uses only the explicit `source_aware_real` path.
 
 ## Non-Goals
 

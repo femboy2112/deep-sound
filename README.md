@@ -12,7 +12,7 @@ Repo-control-plane docs live in:
 
 ## Status
 
-This repository is in **Phase 9 interactive desktop beta hardening**. Phase 8 completed the import-safe desktop controller seam; Phase 9 wires controller-backed PySide actions, selected-track waveform/clip state, clip-owned query features, and result/source action DTOs while keeping PySide optional for default verification.
+This repository is in **Phase 10 optional real-source smoke**. Phase 9 completed the interactive desktop beta hardening seam; Phase 10 keeps the default fake-provider `source_aware` path while adding explicit `source_aware_real` routing for local Demucs smoke tests.
 
 ## Quickstart
 
@@ -23,6 +23,9 @@ bash scripts/bootstrap.sh        # installs uv if missing, runs uv sync --extra 
 # Try the CLI/service beta path
 uv run deep-sound analyze-library --library-db /tmp/deep-sound.sqlite --import-path path/to/audio --profile searchable
 uv run deep-sound index-library --library-db /tmp/deep-sound.sqlite --profile searchable
+
+# Optional real-source smoke when Demucs is installed intentionally
+uv run deep-sound analyze-library --library-db /tmp/deep-sound-real.sqlite --import-path path/to/audio --profile source_aware_real
 
 # Run quality gates
 make verify                       # ruff + mypy + pytest

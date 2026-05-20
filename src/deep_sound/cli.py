@@ -12,6 +12,7 @@ from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
 from deep_sound.infra.analyzers.chroma_librosa import summarize_chroma
 from deep_sound.infra.analyzers.mfcc_librosa import summarize_mfcc
 from deep_sound.infra.analyzers.tempo_librosa import estimate_tempo
+from deep_sound.infra.separation import DemucsProvider
 from deep_sound.infra.storage.sqlite_store import SqliteStore
 from deep_sound.services.analysis_service import AnalysisService
 from deep_sound.services.feature_service import FeatureService
@@ -19,6 +20,7 @@ from deep_sound.services.index_service import IndexService
 from deep_sound.services.library_analysis_service import AnalysisProfile, LibraryAnalysisService
 from deep_sound.services.library_service import LibraryService
 from deep_sound.services.similarity_service import SearchMode, SimilarityService
+from deep_sound.services.source_service import SourceService
 
 
 @click.group()
@@ -110,12 +112,14 @@ def search_similar(
     show_default=True,
 )
 @click.option("--app-data-dir", type=click.Path(file_okay=False), default=None)
+@click.option("--demucs-executable", default="demucs", show_default=True)
 def analyze_library(
     library_db: str,
     import_paths: tuple[str, ...],
     sample_rate: int,
     profile: str,
     app_data_dir: str | None,
+    demucs_executable: str,
 ) -> None:
     """Import optional files/folders, then persist profile features in SQLite."""
     store = SqliteStore(Path(library_db))
@@ -132,12 +136,29 @@ def analyze_library(
     resolved_app_data_dir = (
         Path(app_data_dir) if app_data_dir is not None else db_path.parent / "app_data"
     )
+    selected_profile = AnalysisProfile(profile)
+    source_service = (
+        SourceService(
+            store,
+            app_data_dir=resolved_app_data_dir,
+            separation_provider=DemucsProvider(executable=demucs_executable),
+        )
+        if selected_profile is AnalysisProfile.SOURCE_AWARE_REAL
+        else None
+    )
     service = LibraryAnalysisService(
         store,
         analysis_service=AnalysisService(store, sample_rate=sample_rate),
         app_data_dir=resolved_app_data_dir,
+        source_service=source_service,
     )
-    result = service.analyze_library(profile=profile)
+    result = service.analyze_library(profile=selected_profile)
+    if selected_profile is AnalysisProfile.SOURCE_AWARE_REAL and result.failed_count:
+        first_error = next(
+            (track.error_message for track in result.results if track.error_message),
+            "unknown error",
+        )
+        raise click.ClickException(f"source_aware_real analysis failed: {first_error}")
     click.echo(
         f"Analyzed {result.completed_count}/{result.requested_count} track(s) "
         f"profile={result.profile.value} features={result.feature_count} failed={result.failed_count} "

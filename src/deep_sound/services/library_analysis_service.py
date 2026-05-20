@@ -8,7 +8,7 @@ from pathlib import Path
 
 from deep_sound.domain.feature_view import FeatureView
 from deep_sound.domain.track import Track
-from deep_sound.infra.separation import FakeSeparationProvider
+from deep_sound.infra.separation import DemucsProvider, FakeSeparationProvider
 from deep_sound.infra.storage.sqlite_store import SqliteStore
 from deep_sound.services.analysis_service import AnalysisService
 from deep_sound.services.source_service import SourceService
@@ -18,6 +18,7 @@ class AnalysisProfile(StrEnum):
     MINIMAL = "minimal"
     SEARCHABLE = "searchable"
     SOURCE_AWARE = "source_aware"
+    SOURCE_AWARE_REAL = "source_aware_real"
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,15 +119,24 @@ class LibraryAnalysisService:
 
     def _analyze_track(self, track: Track, profile: AnalysisProfile) -> list[FeatureView]:
         views = list(self._analysis.analyze(track))
-        if profile in {AnalysisProfile.SEARCHABLE, AnalysisProfile.SOURCE_AWARE}:
+        if profile in {
+            AnalysisProfile.SEARCHABLE,
+            AnalysisProfile.SOURCE_AWARE,
+            AnalysisProfile.SOURCE_AWARE_REAL,
+        }:
             views.append(self._analysis.analyze_production_texture(track))
             views.append(self._analysis.structure_feature_view(track))
-        if profile is AnalysisProfile.SOURCE_AWARE:
-            views.extend(self._analyze_source_aware(track))
+        if profile in {AnalysisProfile.SOURCE_AWARE, AnalysisProfile.SOURCE_AWARE_REAL}:
+            views.extend(self._analyze_source_aware(track, profile=profile))
         return views
 
-    def _analyze_source_aware(self, track: Track) -> list[FeatureView]:
-        source_service = self._source_service or self._default_source_service()
+    def _analyze_source_aware(
+        self,
+        track: Track,
+        *,
+        profile: AnalysisProfile,
+    ) -> list[FeatureView]:
+        source_service = self._source_service or self._default_source_service(profile)
         views: list[FeatureView] = []
         stems = self._analysis.separate_stems(track, source_service)
         for stem in stems:
@@ -137,13 +147,18 @@ class LibraryAnalysisService:
                 views.append(self._analysis.analyze_source_timbre(source))
         return views
 
-    def _default_source_service(self) -> SourceService:
+    def _default_source_service(self, profile: AnalysisProfile) -> SourceService:
         if self._app_data_dir is None:
-            raise RuntimeError("source_aware profile requires app_data_dir or source_service")
+            raise RuntimeError(f"{profile.value} profile requires app_data_dir or source_service")
+        separation_provider = (
+            DemucsProvider()
+            if profile is AnalysisProfile.SOURCE_AWARE_REAL
+            else FakeSeparationProvider()
+        )
         return SourceService(
             self._store,
             app_data_dir=self._app_data_dir,
-            separation_provider=FakeSeparationProvider(),
+            separation_provider=separation_provider,
         )
 
 

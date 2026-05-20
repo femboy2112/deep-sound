@@ -1,11 +1,12 @@
 # Repo Audit
 
-This audit inventories the Deep-Sound repository after the Phase 9 interactive desktop beta hardening pass on 2026-05-20. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
+This audit inventories the Deep-Sound repository after the Phase 10 optional real-source smoke pass on 2026-05-20. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
 
 ## Executive Summary
 
-- `ACTIVE_PHASE: 9`; Phase 9 rows define the interactive desktop beta hardening boundary.
+- `ACTIVE_PHASE: 10`; Phase 10 rows define the optional real-source smoke boundary.
 - The runtime now covers a dependency-light desktop beta seam plus interactive wiring DTOs: app/session config, import/analyze/index/search/waveform/clip/feedback controller intents, index/job snapshots, hydrated result cards, source detail DTOs, selected-track waveform/clip state, clip-owned features, and optional PySide widget factories.
+- `source_aware` remains the fake-provider route; `source_aware_real` is the explicit Demucs-backed opt-in path.
 - Core verification remains intentionally light: no required FAISS, PySide, Demucs, learned embeddings, cloud services, packaging installers, or heavy MIR extras.
 - Search and MIR-facing outputs continue to expose confidence/caveats instead of definitive labels.
 - `.claude/` and `.codex/` remain dual control-plane surfaces over the same shared scripts.
@@ -23,13 +24,13 @@ This audit inventories the Deep-Sound repository after the Phase 9 interactive d
 | Area | Status | Notes |
 |---|---|---|
 | Library import | Active | `LibraryService` imports files/folders, dedupes by hash, records failed imports, and preserves originals. |
-| Analysis profiles | Active | `LibraryAnalysisService` supports `minimal`, `searchable`, and `source_aware` profiles. |
+| Analysis profiles | Active | `LibraryAnalysisService` supports `minimal`, `searchable`, `source_aware`, and explicit opt-in `source_aware_real` profiles. |
 | Feature lifecycle | Active | SQLite has feature upsert/replacement APIs, track analysis status updates, and failed-analysis job records. |
 | Searchable profile | Active | `searchable` materializes full-mix rhythm/chroma/MFCC plus production texture and structure features. |
-| Source-aware profile | Beta seam | Uses `FakeSeparationProvider` in core tests; Demucs remains optional. |
+| Source-aware profile | Beta seam | `source_aware` uses `FakeSeparationProvider` in core tests; `source_aware_real` uses `DemucsProvider` and fails clearly when Demucs is absent. |
 | Indexing | Active | `IndexService.build_profile()` builds profile-matched indexes using FAISS wrapper or NumPy fallback. |
 | Search retrieval | Active | `SimilarityService` separates retrieval/rerank, discloses backend, falls back to scans, and filters incompatible source types for source searches. |
-| CLI workflow | Active | `analyze-library --profile`, `index-library --profile`, and `search-library --show-titles --explain` cover the beta path. |
+| CLI workflow | Active | `analyze-library --profile`, `index-library --profile`, and `search-library --show-titles --explain` cover the beta path; `--profile source_aware_real` is the opt-in real-source smoke route. |
 | Clip/window | Active | `ClipWindow`, SQLite `clip_windows`, and `ClipAnalysisService` support clip-owned rhythm/harmony/timbre feature rows under app data. |
 | Waveform/cache | DTO/service seam | `WaveformService` writes JSON peak/RMS cache artifacts without PySide. |
 | UI workflow | Interactive beta seam | `ui/library_workflow.py` maps import/analyze/index/search/progress/warnings/results/waveform/clip/feedback DTOs without importing PySide; `ui/main_window.py` adds controller-backed action binding. |
@@ -50,6 +51,15 @@ This audit inventories the Deep-Sound repository after the Phase 9 interactive d
 | `src/deep_sound/ui/source_graph.py` | Source selection detail, correction gating, and compatible source-search action DTOs. |
 | `tests/test_phase9_*.py` | Focused dependency-light Phase 9 tests plus optional PySide skip smoke. |
 
+## Key Files Added Or Advanced In Phase 10
+
+| Path | Purpose |
+|---|---|
+| `src/deep_sound/infra/separation/providers.py` | Demucs availability, output validation, and opt-in error handling. |
+| `src/deep_sound/services/library_analysis_service.py` | Adds `source_aware_real` routing while preserving the fake-provider `source_aware` default. |
+| `src/deep_sound/cli.py` | Exposes `source_aware_real` plus `--demucs-executable` for optional real-source smoke. |
+| `tests/test_phase10_*.py` | Dependency-light fake-Demucs contract, CLI, artifact-safety, and skip-safe optional smoke coverage. |
+
 ## Governance And Control Plane
 
 | Path | Status | Notes |
@@ -59,19 +69,19 @@ This audit inventories the Deep-Sound repository after the Phase 9 interactive d
 | `.codex/CODEX_AGENT_MAP.md` | Active | Role/delegation map used by current runs. |
 | `.claude/` | Active | Claude-oriented commands/agents/hooks remain available. |
 | `docs/AGENT_HARNESS_SPEC.md` | Active | Shared control-plane contract. |
-| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 9 interactive desktop beta boundary. |
+| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 10 optional real-source smoke boundary. |
 | `docs/build/FILE_PLAN.md` | Active | Mutated only through `scripts/update_plan.py`. |
-| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 8; Phase 9 boundary is in `PHASES.md`. |
+| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 10. |
 | `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 9 closeout is current when P9-015 completes. |
 | `scripts/toolset_review.py` | Active | Suggest-only review; no auto-edits. |
 
 ## Manual QA Checklist
 
-See `docs/desktop_beta_manual_qa.md` for the Phase 9 desktop beta checklist. It covers service workflow, waveform/clip state, clip-owned feature materialization, result/source actions, feedback, and optional PySide smoke steps.
+See `docs/desktop_beta_manual_qa.md` for the Phase 10 desktop beta checklist. It covers service workflow, waveform/clip state, clip-owned feature materialization, result/source actions, feedback, optional PySide smoke steps, and optional real-Demucs smoke steps.
 
 ## Remaining Gaps
 
-- Source-aware acceptance uses fake copied stems for default verification. Real separation quality remains gated behind optional Demucs work.
+- Source-aware acceptance uses fake copied stems for default verification. Real separation quality is now smoke-testable through `source_aware_real`, but quality tuning and broad corpus validation remain future work.
 - Playback transport remains a UI placeholder.
 - `scripts/toolset_review.py` is intentionally shallow and suggest-only; it should not be treated as a complete governance audit.
 
