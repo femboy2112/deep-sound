@@ -8,7 +8,10 @@ A Python 3.11 desktop app for source-aware music similarity. Full spec: `docs/SP
 - `tests/` — pytest suite.
 - `scripts/` — `verify.py`, `repair.py`, `status.py`, `update_plan.py`, `bootstrap.sh`.
 - `docs/build/` — living plan: `FILE_PLAN.md`, `PHASES.md`, `BUILD_LOG.md`, `DECISIONS.md`.
+- `docs/AGENT_HARNESS_SPEC.md` — shared control-plane contract for `.claude/` and `.codex/`.
+- `docs/REPO_AUDIT.md` — repo-wide audit of product and harness surfaces.
 - `.claude/` — Claude Code orchestration; safe to ignore if running Codex.
+- `.codex/` — Codex orchestration: agents, skills, hooks, and repo-local role maps.
 
 ## Build commands
 
@@ -43,6 +46,7 @@ A Python 3.11 desktop app for source-aware music similarity. Full spec: `docs/SP
 - **§10.2 — Service boundaries.** Library, Analysis, Source, Feature, Similarity, Explanation services have public surfaces; cross-service calls go through them.
 - **§17 — Storage policy.** Original audio files MUST NOT be modified. Analysis copies and stems live under `app_data/` (gitignored). Every artifact records algorithm name, version, parameters hash, model version.
 - **§19 — Phasing.** Phases progress 0 → 5. Don't build beyond `ACTIVE_PHASE`.
+- **Harness rule.** Repo-control-plane work may temporarily override the normal picker only when documented in `docs/AGENT_HARNESS_SPEC.md`, `docs/build/DECISIONS.md`, and `docs/build/BUILD_LOG.md`.
 
 ## Don't
 
@@ -55,3 +59,12 @@ A Python 3.11 desktop app for source-aware music similarity. Full spec: `docs/SP
 ## Self-repair
 
 When you finish a session and `make verify` fails, `scripts/repair.py` produces `.build/repair_brief.md`. Open it next session and fix only what it lists. Cap: 3 attempts (tracked in `.build/repair_attempts.txt`). If you hit the cap, stop and report to the human.
+
+## Codex harness
+
+If you are running Codex, also read:
+
+- `.codex/README.md`
+- `.codex/CODEX_AGENT_MAP.md`
+
+Use `make toolset-review` or `python3 scripts/toolset_review.py` when you need a suggest-only review of missing skills, hooks, or other harness additions.

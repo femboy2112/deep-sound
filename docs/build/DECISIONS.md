@@ -31,3 +31,22 @@ Phase 0's similarity-search exit criterion is "ranked results by mode". A plain 
 ## 2026-05-15 — Demucs / Torch behind `[demucs]` extra
 
 Torch + Demucs is ≈2 GB. Not needed until Phase 2 (stem separation). Putting it behind an extra keeps Phase 0/1 CI builds under a minute.
+
+## 2026-05-19 — Temporary harness-first priority override
+
+The normal picker would move from `P0-013` to `P0-014`. For this pass, repo-control-plane work takes temporary priority so Codex gets a first-class local harness comparable to the existing `.claude/` surface.
+
+This override is limited to:
+
+- repo audit docs,
+- harness-spec docs,
+- `.codex/` agents, skills, and hooks,
+- suggest-only self-review tooling under `scripts/`.
+
+The override does not relax product-spec rules, phase ceilings, or the `FILE_PLAN.md` mutation policy. Once the harness pass is complete, normal FILE_PLAN execution resumes.
+
+## 2026-05-19 — Suggest-only toolset review
+
+The new `scripts/toolset_review.py` surface is intentionally non-mutating. It may inspect repo state, verify output, and repair-attempt signals, then write recommendations to `.build/toolset_review.{json,md}`.
+
+It must not auto-edit `.codex/`, `.claude/`, `docs/`, or source files. A human or later agent decides whether to apply any recommendation.

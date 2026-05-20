@@ -4,6 +4,12 @@ A source-aware music similarity desktop application. Analyzes recorded music, de
 
 See [`docs/SPEC.md`](docs/SPEC.md) for the full product spec.
 
+Repo-control-plane docs live in:
+
+- [`docs/AGENT_HARNESS_SPEC.md`](docs/AGENT_HARNESS_SPEC.md)
+- [`docs/REPO_AUDIT.md`](docs/REPO_AUDIT.md)
+- [`docs/build/AGENT_CONTRACT.md`](docs/build/AGENT_CONTRACT.md)
+
 ## Status
 
 This repository is a **build scaffold**. The application itself is being constructed iteratively by AI coding agents (Claude Code, Codex) following a living file plan. The Phase 0 prototype CLI works; later phases are TODO.
@@ -39,6 +45,8 @@ This repo is designed so an AI agent (Claude Code or Codex) can iteratively buil
 
 For Claude Code, see [`CLAUDE.md`](CLAUDE.md). For Codex, see [`AGENTS.md`](AGENTS.md).
 
+The repo now also carries a Codex-native mirror surface in [`.codex/`](.codex/) that reuses the same `docs/build/*` and `scripts/*` backend as `.claude/`.
+
 ## Self-repair
 
 A Claude Code `Stop` hook runs `scripts/verify.py` whenever the agent stops. On failure, `scripts/repair.py` writes `.build/repair_brief.md` with `file:line` context. The agent is prompted to invoke `/repair` next, which dispatches a focused fix. A counter caps the loop at 3 attempts.
@@ -52,6 +60,7 @@ src/deep_sound/          App code: domain/, services/, infra/, cli.py
 tests/                   pytest tests
 scripts/                 verify.py, repair.py, status.py, update_plan.py, bootstrap.sh
 .claude/                 Claude Code orchestration: commands/, agents/, skills/, hooks/, settings.json
+.codex/                  Codex orchestration: agents/, skills/, hooks/, and entry docs
 ```
 
 ## License

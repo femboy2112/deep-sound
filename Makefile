@@ -1,4 +1,4 @@
-.PHONY: bootstrap verify repair status build phase clean help
+.PHONY: bootstrap verify repair status toolset-review build phase clean help
 
 help:
 	@echo "Deep-Sound build orchestration targets:"
@@ -6,6 +6,7 @@ help:
 	@echo "  make verify      Run ruff + mypy + pytest, write .build/verify_report.json"
 	@echo "  make repair      Print .build/repair_brief.md if present"
 	@echo "  make status      Show FILE_PLAN summary and active phase"
+	@echo "  make toolset-review  Write suggest-only harness recommendations"
 	@echo "  make phase       Print current ACTIVE_PHASE"
 	@echo "  make clean       Remove .build/, caches"
 	@echo ""
@@ -24,6 +25,9 @@ repair:
 
 status:
 	uv run python scripts/status.py
+
+toolset-review:
+	python3 scripts/toolset_review.py
 
 phase:
 	uv run python scripts/update_plan.py --print-phase

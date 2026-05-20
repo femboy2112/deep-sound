@@ -4,6 +4,20 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-19 — Codex harness and repo audit pass
+
+- **Agent:** Codex
+- **Scope:** Repo-wide audit plus dual-surface harness work.
+- **Rows touched:** none in `FILE_PLAN.md`; temporary harness-first override documented in `DECISIONS.md`.
+- **Changes:**
+  - Added `docs/REPO_AUDIT.md` to inventory the current repo surface.
+  - Added `docs/AGENT_HARNESS_SPEC.md` to formalize the shared `.claude/` and `.codex/` control plane.
+  - Added `.codex/` agents, skills, hooks, and operator docs.
+  - Added `scripts/toolset_review.py` and a `make toolset-review` target for suggest-only harness recommendations.
+- **Notes:**
+  - The shared backend remains `scripts/status.py`, `scripts/verify.py`, `scripts/repair.py`, and `scripts/update_plan.py`.
+  - Product implementation remains Phase 0 scaffold plus the existing tempo CLI path.
+
 ## 2026-05-15 — Scaffolding sprint
 
 - **Agent:** Claude Code (plan-mode session)
