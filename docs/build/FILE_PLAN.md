@@ -26,15 +26,15 @@ Schema: `id` · `path` · `phase` · `spec_refs` · `status` · `depends_on` · 
 | P0-012 | tests/test_analyze.py | 0 | §13.2 | DONE | P0-008,P0-009,P0-010 | build-engineer | analyze CLI on click-track returns tempo | `pytest tests/test_analyze.py` | 2026-05-15 | scaffolded |
 | P0-013 | tests/test_confidence_bands.py | 0 | §23.2 | DONE | P0-003 | build-engineer | Confidence band boundary tests | `pytest tests/test_confidence_bands.py` | 2026-05-15 | scaffolded |
 | P0-014 | src/deep_sound/infra/analyzers/chroma_librosa.py | 0 | §13.4, §19 | DONE | P0-008 | build-engineer | librosa chroma feature (track-level summary) | `pytest tests/test_chroma.py` | 2026-05-20 | needs new test file |
-| P0-015 | src/deep_sound/infra/analyzers/mfcc_librosa.py | 0 | §13.7, §19 | TODO | P0-008 | build-engineer | librosa MFCC summary stats (timbre) | `pytest tests/test_mfcc.py` | - | needs new test file |
-| P0-016 | src/deep_sound/services/feature_service.py | 0 | §10.2, §16.4 | TODO | P0-007 | build-engineer | minimal in-memory FeatureService for Phase 0 | `pytest tests/test_feature_service.py` | - | upgrade to SQLite in P1 |
-| P0-017 | src/deep_sound/services/similarity_service.py | 0 | §10.2, §14.1, §14.2 | TODO | P0-016 | build-engineer | weighted cosine similarity over feature vectors | `pytest tests/test_similarity.py` | - | FAISS deferred to P1 |
-| P0-018 | src/deep_sound/cli.py (extend) | 0 | §19 | TODO | P0-017 | build-engineer | add `search-similar` subcommand with --mode rhythm/harmony/timbre/weighted | `pytest tests/test_search_cli.py` | - | spec §19 deliverable |
+| P0-015 | src/deep_sound/infra/analyzers/mfcc_librosa.py | 0 | §13.7, §19 | DONE | P0-008 | build-engineer | librosa MFCC summary stats (timbre) | `pytest tests/test_mfcc.py` | 2026-05-20 | needs new test file |
+| P0-016 | src/deep_sound/services/feature_service.py | 0 | §10.2, §16.4 | DONE | P0-007 | build-engineer | minimal in-memory FeatureService for Phase 0 | `pytest tests/test_feature_service.py` | 2026-05-20 | upgrade to SQLite in P1 |
+| P0-017 | src/deep_sound/services/similarity_service.py | 0 | §10.2, §14.1, §14.2 | DONE | P0-016 | build-engineer | weighted cosine similarity over feature vectors | `pytest tests/test_similarity.py` | 2026-05-20 | FAISS deferred to P1 |
+| P0-018 | src/deep_sound/cli.py (extend) | 0 | §19 | DONE | P0-017 | build-engineer | add `search-similar` subcommand with --mode rhythm/harmony/timbre/weighted | `pytest tests/test_search_cli.py` | 2026-05-20 | spec §19 deliverable |
 | P0-019 | tests/test_chroma.py | 0 | §13.4 | DONE | P0-014 | build-engineer | chroma analyzer returns 12-d vector | `pytest tests/test_chroma.py` | 2026-05-20 | - |
-| P0-020 | tests/test_mfcc.py | 0 | §13.7 | TODO | P0-015 | build-engineer | MFCC analyzer returns summary stats | `pytest tests/test_mfcc.py` | - | - |
-| P0-021 | tests/test_feature_service.py | 0 | §16.4 | TODO | P0-016 | build-engineer | FeatureService get/put round-trip | `pytest tests/test_feature_service.py` | - | - |
-| P0-022 | tests/test_similarity.py | 0 | §14.1, §14.2 | TODO | P0-017 | build-engineer | weighted cosine ranks by similarity | `pytest tests/test_similarity.py` | - | - |
-| P0-023 | tests/test_search_cli.py | 0 | §19 | TODO | P0-018 | build-engineer | search-similar CLI end-to-end | `pytest tests/test_search_cli.py` | - | - |
+| P0-020 | tests/test_mfcc.py | 0 | §13.7 | DONE | P0-015 | build-engineer | MFCC analyzer returns summary stats | `pytest tests/test_mfcc.py` | 2026-05-20 | - |
+| P0-021 | tests/test_feature_service.py | 0 | §16.4 | DONE | P0-016 | build-engineer | FeatureService get/put round-trip | `pytest tests/test_feature_service.py` | 2026-05-20 | - |
+| P0-022 | tests/test_similarity.py | 0 | §14.1, §14.2 | DONE | P0-017 | build-engineer | weighted cosine ranks by similarity | `pytest tests/test_similarity.py` | 2026-05-20 | - |
+| P0-023 | tests/test_search_cli.py | 0 | §19 | DONE | P0-018 | build-engineer | search-similar CLI end-to-end | `pytest tests/test_search_cli.py` | 2026-05-20 | - |
 | P1-001 | src/deep_sound/infra/storage/sqlite_store.py | 1 | §11.2, §17.1 | TODO | P0-004,P0-005,P0-006,P0-007 | build-engineer | SQLite schema + DAOs for tracks/sections/stems/sources/feature_views | `pytest tests/test_sqlite_store.py` | - | core P1 infra |
 | P1-002 | src/deep_sound/services/library_service.py | 1 | §10.2, §16.1, §8.1 | TODO | P1-001 | build-engineer | LibraryService: import files/folders, metadata extract, dedupe by hash | `pytest tests/test_library_service.py` | - | - |
 | P1-003 | src/deep_sound/services/analysis_service.py | 1 | §10.2, §16.2 | TODO | P1-001,P0-017 | build-engineer | AnalysisService orchestrating extractors; emits progress | `pytest tests/test_analysis_service.py` | - | - |

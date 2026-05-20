@@ -4,6 +4,27 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 0 search completion
+
+- **Agent:** Codex
+- **Scope:** Complete the Phase 0 CLI analysis/search chain.
+- **Rows touched:** P0-015, P0-016, P0-017, P0-018, P0-020, P0-021, P0-022, P0-023 → DONE.
+- **Changes:**
+  - Added MFCC mean/std timbre summaries with silence handling.
+  - Added in-memory feature storage and weighted cosine similarity.
+  - Added `search-similar` CLI over an on-demand `--corpus-dir` scan.
+  - Added focused tests for MFCC, feature storage, similarity, and CLI search.
+- **Verification:**
+  - `uv run pytest tests/test_mfcc.py`
+  - `uv run pytest tests/test_feature_service.py`
+  - `uv run pytest tests/test_similarity.py`
+  - `uv run pytest tests/test_search_cli.py`
+  - `python3 scripts/verify.py`
+- **Notes:**
+  - Phase 0 remains in-memory and read-only over original audio files; SQLite, FAISS, and UI work remain Phase 1.
+
+---
+
 ## 2026-05-20 — Phase 0 chroma analyzer
 
 - **Agent:** Codex
