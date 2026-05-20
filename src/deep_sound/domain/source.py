@@ -36,3 +36,6 @@ class Source:
     confidence: Confidence
     user_label: str | None = None
     is_user_corrected: bool = False
+    raw_label: str | None = None
+    raw_source_type: SourceType | None = None
+    correction_id: str | None = None

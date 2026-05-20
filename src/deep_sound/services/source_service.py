@@ -152,6 +152,9 @@ class SourceService:
             confidence=source.confidence,
             user_label=effective.label,
             is_user_corrected=True,
+            raw_label=source.source_label,
+            raw_source_type=source.source_type,
+            correction_id=effective.correction_id,
         )
 
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from deep_sound.domain.feature_view import FeatureType, OwnerType
 from deep_sound.domain.source import SourceType
+from deep_sound.services.similarity_service import SearchMode
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +67,67 @@ class Phase5QueryControlState:
     melody_enabled: bool = False
     vocal_timbre_enabled: bool = False
     source_role_enabled: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DesktopQueryState:
+    query_owner_id: str
+    query_owner_type: OwnerType
+    search_mode: SearchMode
+    weights: dict[str, float]
+    source_type: SourceType | None = None
+    clip_start_sec: float | None = None
+    clip_end_sec: float | None = None
+    warnings: tuple[str, ...] = ()
+
+
+def desktop_query_state(
+    *,
+    query_owner_id: str,
+    query_owner_type: OwnerType,
+    search_mode: SearchMode | str,
+    weights: QueryWeights | None = None,
+    source_type: SourceType | None = None,
+    clip_start_sec: float | None = None,
+    clip_end_sec: float | None = None,
+) -> DesktopQueryState:
+    mode = SearchMode(search_mode)
+    current_weights = weights or QueryWeights()
+    warnings: list[str] = []
+    if query_owner_type is OwnerType.CLIP and (clip_start_sec is None or clip_end_sec is None):
+        warnings.append("Clip query is missing a selected time window.")
+    if query_owner_type is OwnerType.SOURCE and not _source_mode_enabled(mode, source_type):
+        warnings.append("Selected source type is not compatible with this search mode.")
+    return DesktopQueryState(
+        query_owner_id=query_owner_id,
+        query_owner_type=query_owner_type,
+        search_mode=mode,
+        weights=_weights_for_mode(mode, current_weights),
+        source_type=source_type,
+        clip_start_sec=clip_start_sec,
+        clip_end_sec=clip_end_sec,
+        warnings=tuple(warnings),
+    )
+
+
+def _weights_for_mode(mode: SearchMode, weights: QueryWeights) -> dict[str, float]:
+    if mode is SearchMode.WEIGHTED:
+        return weights.normalized_phase5_weights()
+    return {mode.value: 1.0}
+
+
+def _source_mode_enabled(mode: SearchMode, source_type: SourceType | None) -> bool:
+    phase3 = phase3_query_control_state(source_type)
+    phase5 = phase5_query_control_state(source_type)
+    if mode in {SearchMode.SOURCE_CHORDS, SearchMode.CHORD_CHANGE}:
+        return phase3.source_chord_enabled
+    if mode is SearchMode.MELODY:
+        return phase5.melody_enabled
+    if mode is SearchMode.VOCAL_TIMBRE:
+        return phase5.vocal_timbre_enabled
+    if mode is SearchMode.SOURCE_ROLE:
+        return phase5.source_role_enabled
+    return True
 
 
 def phase5_query_control_state(source_type: SourceType | None) -> Phase5QueryControlState:

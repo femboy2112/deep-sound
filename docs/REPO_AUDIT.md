@@ -1,11 +1,11 @@
 # Repo Audit
 
-This audit inventories the Deep-Sound repository after the Phase 7 beta acceptance hardening pass on 2026-05-20. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
+This audit inventories the Deep-Sound repository after the Phase 8 desktop beta workflow integration pass on 2026-05-20. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
 
 ## Executive Summary
 
-- `ACTIVE_PHASE: 7`; all Phase 0 through Phase 7 rows are complete except this closeout row while this audit is being written.
-- The runtime now covers a dependency-light real-library beta path: import, profile analysis, profile indexing, indexed/scan search fallback, hydrated CLI output, source-aware fake-provider analysis, clip/window storage, waveform cache DTOs, and import-safe UI workflow DTO seams.
+- `ACTIVE_PHASE: 8`; Phase 8 rows define the desktop beta integration boundary.
+- The runtime now covers a dependency-light desktop beta seam: app/session config, import/analyze/index/search/waveform/clip/feedback controller intents, index/job snapshots, hydrated result cards, source detail DTOs, and optional PySide widget factories.
 - Core verification remains intentionally light: no required FAISS, PySide, Demucs, learned embeddings, cloud services, packaging installers, or heavy MIR extras.
 - Search and MIR-facing outputs continue to expose confidence/caveats instead of definitive labels.
 - `.claude/` and `.codex/` remain dual control-plane surfaces over the same shared scripts.
@@ -16,7 +16,7 @@ This audit inventories the Deep-Sound repository after the Phase 7 beta acceptan
 - Spec-drift risk: medium. Phase 7 is repo-local build-plan scope layered on top of the spec; its acceptance boundary is documented in `docs/build/PHASES.md` and `docs/build/DECISIONS.md`.
 - Dependency risk: low for default gates. Optional FAISS/PySide/Demucs paths remain isolated.
 - Data lifecycle risk: medium. Feature reruns are now idempotent for canonical views, but richer migration/retention policy is still future work.
-- UI risk: medium. DTO/controller seams are import-safe, but full PySide wiring and manual desktop QA remain incomplete.
+- UI risk: medium. Desktop controller and DTO seams are import-safe; real interactive PySide QA remains optional/manual.
 
 ## Current Product Surface
 
@@ -32,17 +32,23 @@ This audit inventories the Deep-Sound repository after the Phase 7 beta acceptan
 | CLI workflow | Active | `analyze-library --profile`, `index-library --profile`, and `search-library --show-titles --explain` cover the beta path. |
 | Clip/window | Storage seam | `ClipWindow` and SQLite `clip_windows` support clip-owned feature rows. |
 | Waveform/cache | DTO/service seam | `WaveformService` writes JSON peak/RMS cache artifacts without PySide. |
-| UI workflow | DTO seam | `ui/library_workflow.py` maps import/analyze/index/search/progress/warnings/results/feedback DTOs without importing PySide. |
+| UI workflow | Desktop beta seam | `ui/library_workflow.py` maps import/analyze/index/search/progress/warnings/results/waveform/clip/feedback DTOs without importing PySide. |
+| Desktop settings | Active | `ui/session_config.py` persists library DB, app data dir, active profile, and last query state. |
+| Result inspection | Active | Result cards retain backend, stale-index warnings, caveats, dimension scores, and feedback action metadata. |
+| Source detail | Active | Source graph/detail DTOs expose confidence, compatible source search controls, and correction metadata. |
 
-## Key Files Added Or Advanced In Phase 7
+## Key Files Added Or Advanced In Phase 8
 
 | Path | Purpose |
 |---|---|
-| `src/deep_sound/services/library_analysis_service.py` | Thin profile orchestrator over existing Library/Analysis/Source services. |
-| `src/deep_sound/domain/clip.py` | User-selected clip/window domain object. |
-| `src/deep_sound/services/waveform_service.py` | Waveform JSON cache artifact writer and clip/waveform DTOs. |
-| `src/deep_sound/ui/library_workflow.py` | Import-safe workflow/controller DTO seam. |
-| `tests/test_phase7_*.py` | Focused Phase 7 storage, profile, CLI, index, source, clip, waveform, UI, integration, and smoke coverage. |
+| `src/deep_sound/ui/session_config.py` | Import-safe desktop session config persistence. |
+| `src/deep_sound/ui/library_workflow.py` | `DesktopWorkflowController` over existing services plus job/result/clip/waveform DTOs. |
+| `src/deep_sound/ui/waveform_panel.py` | Waveform render DTOs and clip selection panel data. |
+| `src/deep_sound/ui/query_builder.py` | Track/clip/source desktop query state mapping. |
+| `src/deep_sound/ui/results_view.py` | Backend/caveat/stale warning and feedback action metadata for result cards. |
+| `src/deep_sound/ui/source_graph.py` | Source detail DTOs with correction and compatible search controls. |
+| `docs/desktop_beta_manual_qa.md` | Manual desktop beta QA checklist. |
+| `tests/test_phase8_*.py` | Focused dependency-light desktop workflow tests plus optional PySide skip smoke. |
 
 ## Governance And Control Plane
 
@@ -53,31 +59,21 @@ This audit inventories the Deep-Sound repository after the Phase 7 beta acceptan
 | `.codex/CODEX_AGENT_MAP.md` | Active | Role/delegation map used by current runs. |
 | `.claude/` | Active | Claude-oriented commands/agents/hooks remain available. |
 | `docs/AGENT_HARNESS_SPEC.md` | Active | Shared control-plane contract. |
-| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 7 acceptance boundary. |
+| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 8 desktop beta boundary. |
 | `docs/build/FILE_PLAN.md` | Active | Mutated only through `scripts/update_plan.py`. |
-| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 7. |
-| `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 7 entries are current. |
+| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 8. |
+| `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 8 entries are current. |
 | `scripts/toolset_review.py` | Active | Suggest-only review; no auto-edits. |
 
 ## Manual QA Checklist
 
-Use a small local folder with at least two valid audio files and one intentionally broken `.wav` text file.
-
-1. Run `deep-sound analyze-library --library-db /tmp/deep-sound-beta.sqlite --import-path <folder> --profile searchable`.
-2. Confirm output reports completed tracks, `profile=searchable`, and a nonzero feature count.
-3. Run the same analyze command again and confirm it succeeds without duplicate feature errors.
-4. Run `deep-sound index-library --library-db /tmp/deep-sound-beta.sqlite --profile searchable`.
-5. Confirm rhythm, chroma, MFCC, production, and structure index lines are printed.
-6. Pick a query track id from the SQLite library and run `deep-sound search-library --library-db /tmp/deep-sound-beta.sqlite --query-id <id> --mode rhythm --show-titles --explain`.
-7. Confirm result rows show title/path metadata, `entity=track`, backend, per-dimension scores, and caveats when a scan fallback is used.
-8. Run a `source_aware` analysis on a tiny test library only when fake-provider behavior is desired; do not install Demucs for default QA.
-9. Open the generated `app_data/waveforms/*.json` cache in a text viewer and confirm it records track id, version, sample rate, duration, and points.
+See `docs/desktop_beta_manual_qa.md` for the Phase 8 desktop beta checklist. It covers service workflow, waveform/clip state, result inspection, feedback, and optional PySide smoke steps.
 
 ## Remaining Gaps
 
-- Full PySide desktop workflow wiring is not implemented; DTOs are ready but widgets/controllers need future rows.
+- Full interactive PySide signal/slot wiring remains a manual/optional follow-up beyond the import-safe controller seam.
 - Source-aware acceptance uses fake copied stems for default verification. Real separation quality remains gated behind optional Demucs work.
-- Clip search has domain/storage/cache seams but not full audio playback or clip-specific analyzer routing in the UI.
+- Clip search has selection/query metadata seams but not full clip-specific analyzer routing or playback.
 - `scripts/toolset_review.py` is intentionally shallow and suggest-only; it should not be treated as a complete governance audit.
 
 ## Closeout Checks

@@ -222,6 +222,12 @@ class IndexService:
                     "algorithm": view.algorithm,
                     "algorithm_version": view.algorithm_version,
                     "params_hash": view.params_hash,
+                    "stats": json.dumps(view.stats, sort_keys=True),
+                    "symbolic_json": view.symbolic_json or "",
+                    "vector_path": "" if view.vector_path is None else str(view.vector_path),
+                    "confidence": (
+                        "" if view.confidence is None else f"{view.confidence.value:.12f}"
+                    ),
                 }
             )
         fingerprint = hashlib.sha256(

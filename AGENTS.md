@@ -45,7 +45,7 @@ A Python 3.11 desktop app for source-aware music similarity. Full spec: `docs/SP
 - **§3.3 / §23 — Confidence policy.** Every inferred label, source, chord, or event carries a `confidence: float` in `[0, 1]`. Never present a label as definite.
 - **§10.2 — Service boundaries.** Library, Analysis, Source, Feature, Similarity, Explanation services have public surfaces; cross-service calls go through them.
 - **§17 — Storage policy.** Original audio files MUST NOT be modified. Analysis copies and stems live under `app_data/` (gitignored). Every artifact records algorithm name, version, parameters hash, model version.
-- **§19 — Phasing.** Phases progress 0 → 5. Don't build beyond `ACTIVE_PHASE`.
+- **§19 — Phasing.** Phases progress through the active plan in `docs/build/PHASES.md`. Don't build beyond `ACTIVE_PHASE`.
 - **Harness rule.** Repo-control-plane work may temporarily override the normal picker only when documented in `docs/AGENT_HARNESS_SPEC.md`, `docs/build/DECISIONS.md`, and `docs/build/BUILD_LOG.md`.
 
 ## Don't

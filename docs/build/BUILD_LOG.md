@@ -4,6 +4,23 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 8 desktop beta workflow integration
+
+- **Agent:** Codex
+- **Scope:** Open Phase 8 and wire dependency-light desktop beta workflow seams.
+- **Rows touched:** P8-001 .. P8-014.
+- **Changes:**
+  - Added Phase 8 plan rows and promoted `ACTIVE_PHASE` to 8 with a desktop-beta boundary decision.
+  - Added import-safe desktop session config persistence.
+  - Added `DesktopWorkflowController` over existing library, analysis, index, similarity, waveform, and correction services.
+  - Added persisted job DTO mapping for import/analyze/index/waveform/feedback controller flows.
+  - Added waveform panel DTOs, clip selection/query metadata, track/clip/source query state, result feedback action data, and source detail DTOs.
+  - Kept PySide optional by isolating imports to widget factories and adding an optional skip smoke test.
+  - Tightened stale-index fingerprinting and source-compatible search filtering to account for feature-value and source-correction changes.
+  - Refreshed README, AGENTS phase wording, REPO_AUDIT, and desktop manual QA docs.
+- **Verification:**
+  - `uv run pytest tests/test_phase8_session_config.py tests/test_phase8_ui_models.py tests/test_phase8_result_cards.py tests/test_phase8_waveform_panel.py tests/test_phase8_source_detail.py tests/test_phase8_desktop_controller.py`
+
 ## 2026-05-20 — Phase 7 user-facing beta acceptance hardening
 
 - **Agent:** Codex

@@ -7,6 +7,7 @@ import math
 from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
 from deep_sound.domain.source import SourceType
 from deep_sound.infra.storage.sqlite_store import SqliteStore
+from deep_sound.services.correction_service import CorrectionService
 
 
 class FeatureService:
@@ -16,8 +17,14 @@ class FeatureService:
     stored in `FeatureView.stats` with deterministic key ordering.
     """
 
-    def __init__(self, store: SqliteStore | None = None) -> None:
+    def __init__(
+        self,
+        store: SqliteStore | None = None,
+        *,
+        correction_service: CorrectionService | None = None,
+    ) -> None:
         self._store = store
+        self._correction_service = correction_service
         self._views: dict[str, FeatureView] = {}
 
     def put(self, view: FeatureView) -> None:
@@ -95,9 +102,12 @@ class FeatureService:
         if self._store is None:
             return None
         try:
-            return self._store.get_source(owner_id).source_type
+            source = self._store.get_source(owner_id)
         except KeyError:
             return None
+        if self._correction_service is not None:
+            return self._correction_service.effective_source(source).source_type
+        return source.source_type
 
     def _validate_stats(self, view: FeatureView) -> None:
         for key, value in view.stats.items():

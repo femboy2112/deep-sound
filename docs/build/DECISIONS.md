@@ -88,3 +88,11 @@ Phase 7 hardens the existing indexed-search backend into a repeatable library wo
 Analysis and indexing must be idempotent. Feature views stay canonical in SQLite, reruns replace or skip equivalent rows instead of creating duplicates, failed files are recorded per track or job, and missing or stale indexes disclose caveats while falling back to trusted scans.
 
 The user-facing beta remains dependency-light. CLI and import-safe UI controller seams may expose import, analyze, index, search, progress, stale-index warnings, clip/window, waveform/cache, and feedback DTOs, but default verification must not require FAISS, PySide, Demucs, learned embeddings, cloud services, installers, or heavy MIR extras.
+
+## 2026-05-20 — Phase 8 desktop beta workflow boundary
+
+Phase 8 promotes the Phase 7 CLI/service beta into an import-safe desktop workflow seam. The desktop controller may route import, profile analysis, profile indexing, search, waveform cache generation, clip selection, source detail inspection, and result feedback through existing services.
+
+Default verification remains dependency-light. PySide imports stay inside widget factories, and optional PySide smoke tests must skip when `[ui]` is not installed. Phase 8 does not add packaging, installers, cloud services, production Demucs quality work, or learned embeddings.
+
+Result and source UI language remains probabilistic. Similarity dimension scores are similarity evidence, not analyzer confidence, and stale/missing-index caveats must stay visible in result inspection.

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from deep_sound.domain.track import Track
 from deep_sound.infra.job_queue import JobRecord, JobState
+from deep_sound.services.library_analysis_service import AnalysisProfile
+from deep_sound.ui.library_workflow import AnalyzeIntentDTO, IndexIntentDTO, SearchIntentDTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +27,32 @@ class QueueRow:
     target_id: str
     state: str
     progress: str
+
+
+@dataclass(frozen=True, slots=True)
+class MainWindowActionMap:
+    analyze_intent: AnalyzeIntentDTO
+    index_intent: IndexIntentDTO
+    refresh_action: str
+    selected_track_search: SearchIntentDTO | None = None
+
+
+def main_window_action_map(
+    *,
+    active_profile: AnalysisProfile,
+    selected_track_id: str | None = None,
+    search_mode: str = "weighted",
+) -> MainWindowActionMap:
+    return MainWindowActionMap(
+        analyze_intent=AnalyzeIntentDTO(profile=active_profile),
+        index_intent=IndexIntentDTO(profile=active_profile),
+        refresh_action="refresh_library_state",
+        selected_track_search=(
+            None
+            if selected_track_id is None
+            else SearchIntentDTO(query_id=selected_track_id, mode=search_mode)
+        ),
+    )
 
 
 def library_rows(tracks: Sequence[Track]) -> list[LibraryRow]:

@@ -13,6 +13,8 @@ class ResultCardData:
     combined_score: float
     dimension_scores: dict[str, float]
     explanation: str
+    query_owner_id: str | None = None
+    result_owner_id: str | None = None
     matched_entity_type: str | None = None
     matched_range: str | None = None
     matched_source: str | None = None
@@ -29,9 +31,26 @@ def confidence_warnings(
     dimension_scores: dict[str, float], threshold: float = 0.5
 ) -> tuple[str, ...]:
     return tuple(
-        f"{name} is low-confidence ({score:.2f})"
+        f"{name} similarity evidence is weak ({score:.2f})"
         for name, score in sorted(dimension_scores.items())
         if score < threshold
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ResultFeedbackActionData:
+    query_owner_id: str
+    result_owner_id: str
+    relevant_value: str = "relevant"
+    irrelevant_value: str = "irrelevant"
+
+
+def result_feedback_action(card: ResultCardData) -> ResultFeedbackActionData | None:
+    if card.query_owner_id is None or card.result_owner_id is None:
+        return None
+    return ResultFeedbackActionData(
+        query_owner_id=card.query_owner_id,
+        result_owner_id=card.result_owner_id,
     )
 
 
@@ -65,10 +84,20 @@ def create_results_view(cards: Sequence[ResultCardData]) -> object:
             card_layout.addWidget(QLabel(f"Range: {card.matched_range}"))
         if card.matched_source:
             card_layout.addWidget(QLabel(f"Source: {card.matched_source}"))
+        card_layout.addWidget(QLabel(f"Backend: {card.search_backend}"))
+        if card.baseline_score is not None or card.feedback_adjustment:
+            baseline = "-" if card.baseline_score is None else f"{card.baseline_score:.0%}"
+            card_layout.addWidget(
+                QLabel(f"Baseline: {baseline}  feedback adjustment {card.feedback_adjustment:+.2f}")
+            )
         scores = ", ".join(
             f"{name} {score:.0%}" for name, score in sorted(card.dimension_scores.items())
         )
         card_layout.addWidget(QLabel(scores))
+        for warning in card.stale_index_warnings:
+            card_layout.addWidget(QLabel(f"Index warning: {warning}"))
+        for caveat in card.caveats:
+            card_layout.addWidget(QLabel(f"Caveat: {caveat}"))
         for warning in card.warnings:
             card_layout.addWidget(QLabel(warning))
         card_layout.addWidget(QLabel(card.explanation))

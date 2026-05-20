@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 7
+**ACTIVE_PHASE:** 9
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -136,3 +136,34 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - Keep fake-provider source-aware acceptance paths dependency-light; Demucs, FAISS, PySide, learned embeddings, cloud services, and heavy MIR extras remain optional.
 
 **FILE_PLAN ids:** `P7-001` .. `P7-0NN`.
+
+---
+
+## Phase 8 — Desktop Beta Workflow Integration
+
+**Goal:** Turn the import-safe service and DTO seams into a usable desktop beta workflow for local QA without making PySide a default verification dependency.
+
+**Required capabilities:**
+- Persist app settings for library database path, app data directory, active analysis profile, and last query.
+- Route desktop intents for import, profile analysis, profile indexing, search, waveform cache generation, clip selection, and feedback through existing services.
+- Map long-running analyze, index, and waveform work to visible job/progress DTOs and failure records.
+- Render query, waveform/clip, hydrated result, stale-index, source-detail, and feedback DTOs without requiring PySide imports.
+- Keep source, chord, event, and result language confidence/caveat based.
+
+**FILE_PLAN ids:** `P8-001` .. `P8-0NN`.
+
+---
+
+## Phase 9 — Interactive Desktop Beta Hardening
+
+**Goal:** Move from import-safe desktop workflow seams to real interactive PySide desktop wiring with background execution, clip-owned search, and manual QA hardening.
+
+**Required capabilities:**
+- Bootstrap a PySide app/window around an injected `DesktopWorkflowController`.
+- Connect main-window actions, selection changes, query builder controls, result feedback actions, waveform/clip selection, and source graph/detail controls to controller intents.
+- Keep analysis, indexing, waveform cache generation, and clip feature materialization off the UI thread through a Qt-compatible runner adapter.
+- Materialize clip-owned feature views before clip search using existing analyzers and storage policy.
+- Preserve visible backend, stale-index, caveat, confidence, and correction metadata in all interactive result/source views.
+- Keep PySide smoke tests optional and skipped unless `[ui]` is installed.
+
+**FILE_PLAN ids:** `P9-001` .. `P9-0NN`.

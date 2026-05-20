@@ -12,7 +12,7 @@ Repo-control-plane docs live in:
 
 ## Status
 
-This repository is a **build scaffold**. The application itself is being constructed iteratively by AI coding agents (Claude Code, Codex) following a living file plan. The Phase 0 prototype CLI works; later phases are TODO.
+This repository is in **Phase 8 desktop beta workflow integration**. Phase 7 completed the dependency-light CLI/service beta path; Phase 8 wires that path into import-safe desktop controller and UI DTO seams while keeping PySide optional for default verification.
 
 ## Quickstart
 
@@ -20,8 +20,9 @@ This repository is a **build scaffold**. The application itself is being constru
 # One-time setup
 bash scripts/bootstrap.sh        # installs uv if missing, runs uv sync --extra dev
 
-# Try the Phase 0 CLI
-uv run deep-sound analyze path/to/your.wav
+# Try the CLI/service beta path
+uv run deep-sound analyze-library --library-db /tmp/deep-sound.sqlite --import-path path/to/audio --profile searchable
+uv run deep-sound index-library --library-db /tmp/deep-sound.sqlite --profile searchable
 
 # Run quality gates
 make verify                       # ruff + mypy + pytest
@@ -40,7 +41,7 @@ This repo is designed so an AI agent (Claude Code or Codex) can iteratively buil
 | `/repair` | Fixes the last verification failure using `.build/repair_brief.md` |
 | `/verify` | Runs ruff + mypy + pytest |
 | `/status` | Prints plan summary, active phase, repair-brief presence |
-| `/phase <n>` | Promotes the active build phase (0 → 5) |
+| `/phase <n>` | Promotes the active build phase; see [`docs/build/PHASES.md`](docs/build/PHASES.md) |
 | `/replan` | Re-derives FILE_PLAN rows from spec updates |
 
 For Claude Code, see [`CLAUDE.md`](CLAUDE.md). For Codex, see [`AGENTS.md`](AGENTS.md).

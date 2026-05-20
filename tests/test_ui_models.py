@@ -36,7 +36,7 @@ def test_query_weights_normalize_phase1_dimensions_only() -> None:
     assert weights.normalized_phase1_weights() == {"rhythm": 0.25, "harmony": 0.25, "timbre": 0.5}
 
 
-def test_result_warnings_flag_low_confidence_dimensions() -> None:
+def test_result_warnings_flag_weak_similarity_dimensions() -> None:
     warnings = confidence_warnings({"rhythm": 0.8, "harmony": 0.42})
 
-    assert warnings == ("harmony is low-confidence (0.42)",)
+    assert warnings == ("harmony similarity evidence is weak (0.42)",)
