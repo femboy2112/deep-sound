@@ -19,6 +19,8 @@ class ResultCardData:
     matched_stem: str | None = None
     baseline_score: float | None = None
     feedback_adjustment: float = 0.0
+    search_backend: str = "scan"
+    stale_index_warnings: tuple[str, ...] = field(default_factory=tuple)
     caveats: tuple[str, ...] = field(default_factory=tuple)
     warnings: tuple[str, ...] = field(default_factory=tuple)
 

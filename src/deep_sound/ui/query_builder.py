@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from deep_sound.domain.feature_view import FeatureType, OwnerType
 from deep_sound.domain.source import SourceType
 
 
@@ -76,6 +77,28 @@ def phase5_query_control_state(source_type: SourceType | None) -> Phase5QueryCon
         vocal_timbre_enabled=source_compatible,
         source_role_enabled=source_compatible,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class IndexStatusDTO:
+    feature_type: FeatureType
+    owner_type: OwnerType
+    available: bool
+    stale: bool
+    backend: str
+    feature_count: int
+    dim: int
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class IndexedSearchResultMetadata:
+    search_backend: str
+    matched_entity_type: str | None
+    matched_range: str | None
+    dimension_scores: dict[str, float]
+    caveats: tuple[str, ...] = ()
+    feedback_adjustment: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

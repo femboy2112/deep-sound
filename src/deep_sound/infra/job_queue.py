@@ -284,3 +284,19 @@ class JobQueue:
     def _validate_progress(self, progress: float) -> None:
         if not 0.0 <= progress <= 1.0:
             raise ValueError(f"Job progress must be in [0, 1]: {progress}")
+
+
+def submit_build_index_job(
+    queue: JobQueue,
+    *,
+    feature_type: str,
+    owner_type: str = "track",
+    target_id: str = "library",
+) -> JobRecord:
+    """Queue a resumable index-build job with feature/owner metadata."""
+    return queue.submit(
+        JobType.BUILD_INDEX,
+        JobTargetType.LIBRARY,
+        target_id,
+        parameters={"feature_type": feature_type, "owner_type": owner_type},
+    )

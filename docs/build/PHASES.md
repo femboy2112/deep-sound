@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 5
+**ACTIVE_PHASE:** 6
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -105,3 +105,18 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - Cross-song source role matching.
 
 **FILE_PLAN ids:** `P5-001` .. `P5-0NN`.
+
+---
+
+## Phase 6 — Indexed Library Beta
+
+**Goal:** Make persisted libraries searchable end to end with dependency-light indexed retrieval.
+
+**Required capabilities:**
+- Query persisted SQLite feature views by owner/type and stable numeric vector.
+- Build one optional acceleration index per feature type and owner type using the existing FAISS/NumPy wrapper.
+- Detect missing or stale indexes and fall back to trusted persisted scans with explicit metadata.
+- Keep candidate retrieval and reranking separate, including Phase 4 feedback adjustment metadata.
+- Expose import/analyze/index/search flows through CLI/service/UI DTO seams without requiring FAISS, PySide, Demucs, or MIR extras.
+
+**FILE_PLAN ids:** `P6-001` .. `P6-0NN`.

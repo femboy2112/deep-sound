@@ -365,6 +365,13 @@ class SqliteStore:
             )
         return view
 
+    def get_feature_view(self, view_id: str) -> FeatureView:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM feature_views WHERE id = ?", (view_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"FeatureView not found: {view_id}")
+        return _feature_view_from_row(row)
+
     def list_feature_views_for_owner(self, owner_id: str) -> list[FeatureView]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -372,6 +379,47 @@ class SqliteStore:
                 (owner_id,),
             ).fetchall()
         return [_feature_view_from_row(row) for row in rows]
+
+    def list_feature_views_by_type(
+        self,
+        feature_type: FeatureType,
+        *,
+        owner_type: OwnerType | None = None,
+    ) -> list[FeatureView]:
+        sql = "SELECT * FROM feature_views WHERE feature_type = ?"
+        params: list[str] = [feature_type.value]
+        if owner_type is not None:
+            sql += " AND owner_type = ?"
+            params.append(owner_type.value)
+        sql += " ORDER BY owner_type ASC, owner_id ASC, id ASC"
+        with self._connect() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        return [_feature_view_from_row(row) for row in rows]
+
+    def get_feature_view_for_owner(
+        self,
+        owner_id: str,
+        feature_type: FeatureType,
+        *,
+        owner_type: OwnerType | None = None,
+    ) -> FeatureView:
+        sql = "SELECT * FROM feature_views WHERE owner_id = ? AND feature_type = ?"
+        params: list[str] = [owner_id, feature_type.value]
+        if owner_type is not None:
+            sql += " AND owner_type = ?"
+            params.append(owner_type.value)
+        sql += " ORDER BY id ASC"
+        with self._connect() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        if not rows:
+            raise KeyError(
+                f"FeatureView not found for owner={owner_id!r}, type={feature_type.value!r}"
+            )
+        if len(rows) > 1:
+            raise ValueError(
+                f"Multiple FeatureViews for owner={owner_id!r}, type={feature_type.value!r}"
+            )
+        return _feature_view_from_row(rows[0])
 
     def add_similarity_index(self, record: SimilarityIndexRecord) -> SimilarityIndexRecord:
         with self._connect() as conn:

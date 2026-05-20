@@ -4,6 +4,29 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 6 indexed library beta
+
+- **Agent:** Codex
+- **Scope:** Open Phase 6 and implement dependency-light indexed search over persisted SQLite feature views.
+- **Rows touched:** P6-001 .. P6-014 → DONE.
+- **Changes:**
+  - Added Phase 6 plan rows, promoted `ACTIVE_PHASE` to 6, and documented the indexed-library beta boundary.
+  - Added SQLite feature query APIs, a store-backed `FeatureService` path, and stable sorted stats vector reads.
+  - Added `IndexService` to build one persisted FAISS/NumPy index per feature type and owner type, write manifest metadata, and detect stale or missing indexes.
+  - Split similarity candidate retrieval from reranking, using current indexes when available and persisted scan fallback with explicit backend/caveat metadata.
+  - Added dependency-light CLI commands for SQLite library analysis, index building, and indexed search.
+  - Added resumable build-index job metadata helpers and import-safe UI DTO fields for index status and indexed result metadata.
+- **Verification:**
+  - `uv run pytest tests/test_update_plan.py tests/test_phase6_cli.py tests/test_sqlite_feature_queries.py tests/test_store_feature_service.py tests/test_index_service.py tests/test_indexed_similarity.py tests/test_phase6_jobs.py tests/test_phase6_ui_models.py tests/test_phase6_integration.py tests/test_phase6_performance.py`
+  - `uv run ruff check src/deep_sound/services/index_service.py src/deep_sound/services/feature_service.py src/deep_sound/services/similarity_service.py src/deep_sound/infra/storage/sqlite_store.py src/deep_sound/cli.py src/deep_sound/ui/query_builder.py src/deep_sound/ui/results_view.py tests/test_sqlite_feature_queries.py tests/test_store_feature_service.py tests/test_index_service.py tests/test_indexed_similarity.py tests/test_phase6_cli.py tests/test_phase6_jobs.py tests/test_phase6_ui_models.py tests/test_phase6_integration.py tests/test_phase6_performance.py`
+  - `uv run mypy src/deep_sound`
+  - `python3 scripts/verify.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/toolset_review.py`
+- **Notes:**
+  - Core verification does not require FAISS, PySide, Demucs, learned embeddings, cloud services, or heavy MIR extras.
+  - Indexes are treated as acceleration only; persisted feature rows remain canonical and stale/missing indexes fall back to scans.
+
 ## 2026-05-20 — Phase 4 correction loop and feedback-aware ranking
 
 - **Agent:** Codex

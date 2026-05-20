@@ -10,6 +10,7 @@ from deep_sound.domain.corrections import clamp_score
 from deep_sound.domain.feature_view import FeatureType, OwnerType
 from deep_sound.services.correction_service import CorrectionService
 from deep_sound.services.feature_service import FeatureService
+from deep_sound.services.index_service import IndexService
 
 
 class SearchMode(StrEnum):
@@ -70,6 +71,8 @@ class SimilarityResult:
     caveats: tuple[str, ...] = ()
     baseline_score: float | None = None
     feedback_adjustment: float = 0.0
+    search_backend: str = "scan"
+    retrieval_caveats: tuple[str, ...] = ()
 
 
 class SimilarityService:
@@ -80,9 +83,11 @@ class SimilarityService:
         features: FeatureService,
         *,
         correction_service: CorrectionService | None = None,
+        index_service: IndexService | None = None,
     ) -> None:
         self._features = features
         self._correction_service = correction_service
+        self._index_service = index_service
 
     def search(
         self,
@@ -101,19 +106,15 @@ class SimilarityService:
         if not query_views:
             raise KeyError(f"No features found for query owner: {query_id}")
 
-        candidate_ids: set[str] = set()
-        candidate_owner_types: dict[str, OwnerType] = {}
-        for feature_type in normalized_weights:
-            for view in self._features.list_by_type(feature_type):
-                if view.owner_id == query_id:
-                    continue
-                if owner_type is not None and view.owner_type is not owner_type:
-                    continue
-                candidate_ids.add(view.owner_id)
-                candidate_owner_types[view.owner_id] = view.owner_type
+        retrieval = self._retrieve_candidates(
+            query_id=query_id,
+            feature_types=tuple(normalized_weights),
+            owner_type=owner_type,
+            top_k=top_k,
+        )
 
         results: list[SimilarityResult] = []
-        for candidate_id in sorted(candidate_ids):
+        for candidate_id in sorted(retrieval.candidate_ids):
             dimension_scores: dict[str, float] = {}
             weighted_total = 0.0
             weight_total = 0.0
@@ -130,9 +131,11 @@ class SimilarityService:
                 self._result_for_candidate(
                     query_id=query_id,
                     candidate_id=candidate_id,
-                    owner_type=candidate_owner_types.get(candidate_id, OwnerType.TRACK),
+                    owner_type=retrieval.owner_types.get(candidate_id, OwnerType.TRACK),
                     score=weighted_total / weight_total,
                     dimension_scores=dimension_scores,
+                    search_backend=retrieval.backend,
+                    retrieval_caveats=retrieval.caveats,
                 )
             )
 
@@ -146,13 +149,18 @@ class SimilarityService:
         owner_type: OwnerType,
         score: float,
         dimension_scores: dict[str, float],
+        search_backend: str,
+        retrieval_caveats: tuple[str, ...],
     ) -> SimilarityResult:
         baseline_score = clamp_score(score)
         feedback_adjustment = self._feedback_adjustment(query_id, candidate_id)
         adjusted_score = clamp_score(baseline_score + feedback_adjustment)
-        caveats: tuple[str, ...] = ()
+        caveats: tuple[str, ...] = retrieval_caveats
         if feedback_adjustment:
-            caveats = (f"User result feedback adjusted this score by {feedback_adjustment:+.2f}.",)
+            caveats = (
+                *caveats,
+                f"User result feedback adjusted this score by {feedback_adjustment:+.2f}.",
+            )
         if owner_type is OwnerType.STEM:
             return SimilarityResult(
                 owner_id=candidate_id,
@@ -165,6 +173,8 @@ class SimilarityService:
                 caveats=("Stem-level match is probabilistic.", *caveats),
                 baseline_score=baseline_score,
                 feedback_adjustment=feedback_adjustment,
+                search_backend=search_backend,
+                retrieval_caveats=retrieval_caveats,
             )
         if owner_type is OwnerType.SOURCE:
             matched_range, source_caveats = _source_result_metadata(dimension_scores)
@@ -179,6 +189,8 @@ class SimilarityService:
                 caveats=(*source_caveats, *caveats),
                 baseline_score=baseline_score,
                 feedback_adjustment=feedback_adjustment,
+                search_backend=search_backend,
+                retrieval_caveats=retrieval_caveats,
             )
         return SimilarityResult(
             owner_id=candidate_id,
@@ -189,6 +201,8 @@ class SimilarityService:
             caveats=caveats,
             baseline_score=baseline_score,
             feedback_adjustment=feedback_adjustment,
+            search_backend=search_backend,
+            retrieval_caveats=retrieval_caveats,
         )
 
     def _feedback_adjustment(self, query_id: str, candidate_id: str) -> float:
@@ -270,6 +284,63 @@ class SimilarityService:
             self._features.vector_for(candidate_view),
         )
 
+    def _retrieve_candidates(
+        self,
+        *,
+        query_id: str,
+        feature_types: tuple[FeatureType, ...],
+        owner_type: OwnerType | None,
+        top_k: int,
+    ) -> _RetrievalStage:
+        candidate_ids: set[str] = set()
+        candidate_owner_types: dict[str, OwnerType] = {}
+        caveats: set[str] = set()
+        used_index = False
+        used_scan = False
+        retrieval_limit = max(top_k * 10, 100)
+
+        for feature_type in feature_types:
+            try:
+                query_view = self._features.get_for_owner(query_id, feature_type)
+            except KeyError:
+                continue
+            retrieval_owner_type = owner_type or query_view.owner_type
+            indexed_ids: list[str] = []
+            if self._index_service is not None:
+                query_vector = self._features.vector_for(query_view)
+                indexed_ids, status = self._index_service.query(
+                    feature_type,
+                    query_vector,
+                    owner_type=retrieval_owner_type,
+                    top_k=retrieval_limit,
+                )
+                caveats.update(status.caveats)
+                used_index = used_index or (bool(indexed_ids) and status.available)
+            if indexed_ids:
+                for candidate_id in indexed_ids:
+                    if candidate_id != query_id:
+                        candidate_ids.add(candidate_id)
+                        candidate_owner_types[candidate_id] = retrieval_owner_type
+                continue
+
+            used_scan = True
+            caveats.add("No usable index for at least one dimension; scanned persisted features.")
+            for view in self._features.list_by_type(feature_type, owner_type=retrieval_owner_type):
+                if view.owner_id == query_id:
+                    continue
+                candidate_ids.add(view.owner_id)
+                candidate_owner_types[view.owner_id] = view.owner_type
+
+        backend = "index" if used_index and not used_scan else "scan"
+        if used_index and used_scan:
+            backend = "mixed"
+        return _RetrievalStage(
+            candidate_ids=candidate_ids,
+            owner_types=candidate_owner_types,
+            backend=backend,
+            caveats=tuple(sorted(caveats)),
+        )
+
     def _normalize_weights(self, weights: dict[str, float]) -> dict[FeatureType, float]:
         if not weights:
             return {feature_type: 1.0 for feature_type in MODE_FEATURE_TYPES[SearchMode.WEIGHTED]}
@@ -341,3 +412,11 @@ def _source_result_metadata(
     if FeatureType.TIMBRE_EMBEDDING.value in dimensions:
         return ("source timbre proxy", ("Source timbre evidence is probabilistic.",))
     return ("source features", ("Source-level match is probabilistic.",))
+
+
+@dataclass(frozen=True, slots=True)
+class _RetrievalStage:
+    candidate_ids: set[str]
+    owner_types: dict[str, OwnerType]
+    backend: str
+    caveats: tuple[str, ...]

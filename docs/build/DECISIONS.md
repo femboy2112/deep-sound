@@ -74,3 +74,9 @@ Correction-aware ranking is deterministic and bounded: relevant feedback may add
 Phase 5 starts with deterministic, lightweight proxy features for production texture, structure, melody contour, vocal/source timbre, and source-role matching. Learned embeddings, heavy extras, and model-backed separation or melody systems remain optional follow-up work unless a later row explicitly requires them.
 
 Advanced dimensions remain separate, normalized similarity evidence. Phase 5 must not collapse results into one opaque embedding, bypass source routing, mutate raw analyzer output, or present production, melody, structure, source-role, chord, or vocal labels as definitive.
+
+## 2026-05-20 — Phase 6 indexed library beta boundary
+
+Phase 6 promotes real-library search over persisted SQLite feature views. Indexes are an acceleration layer, not the source of truth: feature rows remain canonical, missing or stale indexes fall back to persisted scans, and result metadata must disclose the backend used.
+
+The beta remains dependency-light. Core verification may use the existing NumPy fallback in the FAISS wrapper and must not require FAISS, PySide, Demucs, learned embeddings, cloud services, packaging installers, or heavy MIR extras.
