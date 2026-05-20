@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 
 from deep_sound.domain.confidence import Confidence
 
@@ -27,5 +28,6 @@ class Stem:
     track_id: str
     stem_type: StemType
     confidence: Confidence
+    artifact_path: Path | None = None
     model_name: str | None = None
     model_version: str | None = None

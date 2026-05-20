@@ -4,6 +4,40 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 1 desktop MVP backbone
+
+- **Agent:** Codex
+- **Scope:** Complete the remaining Phase 1 desktop MVP backbone.
+- **Rows touched:** P1-003, P1-004, P1-005, P1-006, P1-007, P1-008, P1-009, P1-010 → DONE.
+- **Changes:**
+  - Added an in-memory job queue with typed jobs, progress, structured errors, cancellation, and deterministic tests.
+  - Added AnalysisService orchestration for full-mix rhythm, chroma, and MFCC feature views persisted through SQLite.
+  - Added a FAISS-compatible vector index with normalized vectors, JSON manifest persistence, and a NumPy fallback for core installs.
+  - Added cautious explanation summaries with low-confidence caveats.
+  - Added import-safe Phase 1 UI modules for the main window, track detail, query builder, and results view; PySide remains optional.
+- **Verification:**
+  - `uv run pytest tests/test_sqlite_store.py tests/test_library_service.py tests/test_job_queue.py tests/test_analysis_service.py tests/test_faiss_index.py tests/test_explanation_service.py tests/test_ui_models.py`
+  - `uv run ruff check src/deep_sound/ui tests/test_ui_models.py`
+  - `uv run mypy src/deep_sound/ui`
+  - `python3 scripts/verify.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/toolset_review.py`
+
+## 2026-05-20 — Phase 1 storage and library import
+
+- **Agent:** Codex
+- **Scope:** Implement Phase 1 SQLite storage and library import.
+- **Rows touched:** P1-001, P1-002 → DONE.
+- **Changes:**
+  - Added stdlib SQLite schema and narrow DAO methods for tracks, stems, sources, source activity, feature views, similarity indices, corrections, and jobs.
+  - Added Phase 1 track metadata fields and stem artifact-path metadata.
+  - Added LibraryService file/folder import with `soundfile.info`, filename-title fallback, SHA-256 dedupe, failed-file job recording, and batch continuation.
+  - Added storage and library tests covering schema, DAO round trips, dedupe, import failures, folder recursion, and original-audio immutability.
+- **Verification:**
+  - `uv run pytest tests/test_sqlite_store.py tests/test_library_service.py`
+  - `uv run mypy src/deep_sound`
+  - `python3 scripts/verify.py`
+
 ## 2026-05-20 — Phase 0 search completion
 
 - **Agent:** Codex

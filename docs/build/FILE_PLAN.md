@@ -35,13 +35,13 @@ Schema: `id` · `path` · `phase` · `spec_refs` · `status` · `depends_on` · 
 | P0-021 | tests/test_feature_service.py | 0 | §16.4 | DONE | P0-016 | build-engineer | FeatureService get/put round-trip | `pytest tests/test_feature_service.py` | 2026-05-20 | - |
 | P0-022 | tests/test_similarity.py | 0 | §14.1, §14.2 | DONE | P0-017 | build-engineer | weighted cosine ranks by similarity | `pytest tests/test_similarity.py` | 2026-05-20 | - |
 | P0-023 | tests/test_search_cli.py | 0 | §19 | DONE | P0-018 | build-engineer | search-similar CLI end-to-end | `pytest tests/test_search_cli.py` | 2026-05-20 | - |
-| P1-001 | src/deep_sound/infra/storage/sqlite_store.py | 1 | §11.2, §17.1 | TODO | P0-004,P0-005,P0-006,P0-007 | build-engineer | SQLite schema + DAOs for tracks/sections/stems/sources/feature_views | `pytest tests/test_sqlite_store.py` | - | core P1 infra |
-| P1-002 | src/deep_sound/services/library_service.py | 1 | §10.2, §16.1, §8.1 | TODO | P1-001 | build-engineer | LibraryService: import files/folders, metadata extract, dedupe by hash | `pytest tests/test_library_service.py` | - | - |
-| P1-003 | src/deep_sound/services/analysis_service.py | 1 | §10.2, §16.2 | TODO | P1-001,P0-017 | build-engineer | AnalysisService orchestrating extractors; emits progress | `pytest tests/test_analysis_service.py` | - | - |
-| P1-004 | src/deep_sound/infra/job_queue.py | 1 | §10.3, §NFR-001,§NFR-003 | TODO | - | build-engineer | background job queue (multiprocessing); UI never blocked | `pytest tests/test_job_queue.py` | - | - |
-| P1-005 | src/deep_sound/infra/index/faiss_index.py | 1 | §14.3, §17.1 | TODO | P0-017 | build-engineer | FAISS-backed vector index with manifest | `pytest tests/test_faiss_index.py` | - | - |
-| P1-006 | src/deep_sound/ui/main_window.py | 1 | §15.1, §15.2 | TODO | P1-002,P1-003 | build-engineer | PySide6 main window with library view | manual smoke test | - | needs `--extra ui` |
-| P1-007 | src/deep_sound/ui/track_detail.py | 1 | §15.3 | TODO | P1-006 | build-engineer | PySide6 track detail with waveform + sections | manual smoke test | - | - |
-| P1-008 | src/deep_sound/ui/query_builder.py | 1 | §15.5 | TODO | P1-006 | build-engineer | PySide6 query builder with weighted sliders | manual smoke test | - | - |
-| P1-009 | src/deep_sound/ui/results_view.py | 1 | §15.6, §14.8 | TODO | P1-006,P1-005 | build-engineer | PySide6 result cards with per-dimension scores | manual smoke test | - | - |
-| P1-010 | src/deep_sound/services/explanation_service.py | 1 | §10.2, §16.6, §14.8 | TODO | P1-005 | build-engineer | converts ScoreDetails → human-readable summary | `pytest tests/test_explanation_service.py` | - | - |
+| P1-001 | src/deep_sound/infra/storage/sqlite_store.py | 1 | §11.2, §17.1 | DONE | P0-004,P0-005,P0-006,P0-007 | build-engineer | SQLite schema + DAOs for tracks/sections/stems/sources/feature_views | `pytest tests/test_sqlite_store.py` | - | core P1 infra |
+| P1-002 | src/deep_sound/services/library_service.py | 1 | §10.2, §16.1, §8.1 | DONE | P1-001 | build-engineer | LibraryService: import files/folders, metadata extract, dedupe by hash | `pytest tests/test_library_service.py` | - | - |
+| P1-003 | src/deep_sound/services/analysis_service.py | 1 | §10.2, §16.2 | DONE | P1-001,P0-017 | build-engineer | AnalysisService orchestrating extractors; emits progress | `pytest tests/test_analysis_service.py` | - | - |
+| P1-004 | src/deep_sound/infra/job_queue.py | 1 | §10.3, §NFR-001,§NFR-003 | DONE | - | build-engineer | background job queue (multiprocessing); UI never blocked | `pytest tests/test_job_queue.py` | - | - |
+| P1-005 | src/deep_sound/infra/index/faiss_index.py | 1 | §14.3, §17.1 | DONE | P0-017 | build-engineer | FAISS-backed vector index with manifest | `pytest tests/test_faiss_index.py` | - | - |
+| P1-006 | src/deep_sound/ui/main_window.py | 1 | §15.1, §15.2 | DONE | P1-002,P1-003 | build-engineer | PySide6 main window with library view | manual smoke test | - | needs `--extra ui` |
+| P1-007 | src/deep_sound/ui/track_detail.py | 1 | §15.3 | DONE | P1-006 | build-engineer | PySide6 track detail with waveform + sections | manual smoke test | - | - |
+| P1-008 | src/deep_sound/ui/query_builder.py | 1 | §15.5 | DONE | P1-006 | build-engineer | PySide6 query builder with weighted sliders | manual smoke test | - | - |
+| P1-009 | src/deep_sound/ui/results_view.py | 1 | §15.6, §14.8 | DONE | P1-006,P1-005 | build-engineer | PySide6 result cards with per-dimension scores | manual smoke test | - | - |
+| P1-010 | src/deep_sound/services/explanation_service.py | 1 | §10.2, §16.6, §14.8 | DONE | P1-005 | build-engineer | converts ScoreDetails → human-readable summary | `pytest tests/test_explanation_service.py` | - | - |

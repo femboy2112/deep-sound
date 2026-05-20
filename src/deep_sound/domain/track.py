@@ -10,13 +10,19 @@ from pathlib import Path
 class Track:
     """A single imported audio file with library metadata.
 
-    Stub for Phase 0. Full schema (sample_rate, audio_hash, import_status,
-    created_at, etc.) lands with the SQLite store in Phase 1 — see
-    docs/DATA_MODEL.md and spec §11.2.
+    Phase 1 carries the SQLite-backed metadata needed for import, dedupe, and
+    analysis-status tracking while keeping the Phase 0 fields backward
+    compatible.
     """
 
     id: str
     filepath: Path
     title: str | None = None
     artist: str | None = None
+    album: str | None = None
     duration_sec: float | None = None
+    sample_rate: int | None = None
+    audio_hash: str | None = None
+    import_status: str = "imported"
+    analysis_status: str = "pending"
+    created_at: str | None = None
