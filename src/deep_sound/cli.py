@@ -16,6 +16,7 @@ from deep_sound.infra.storage.sqlite_store import SqliteStore
 from deep_sound.services.analysis_service import AnalysisService
 from deep_sound.services.feature_service import FeatureService
 from deep_sound.services.index_service import IndexService
+from deep_sound.services.library_analysis_service import AnalysisProfile, LibraryAnalysisService
 from deep_sound.services.library_service import LibraryService
 from deep_sound.services.similarity_service import SearchMode, SimilarityService
 
@@ -102,8 +103,21 @@ def search_similar(
 @click.option("--library-db", required=True, type=click.Path(dir_okay=False))
 @click.option("--import-path", "import_paths", multiple=True, type=click.Path(exists=True))
 @click.option("--sample-rate", default=22050, show_default=True, type=int)
-def analyze_library(library_db: str, import_paths: tuple[str, ...], sample_rate: int) -> None:
-    """Import optional files/folders, then persist full-mix features in SQLite."""
+@click.option(
+    "--profile",
+    type=click.Choice([profile.value for profile in AnalysisProfile]),
+    default=AnalysisProfile.MINIMAL.value,
+    show_default=True,
+)
+@click.option("--app-data-dir", type=click.Path(file_okay=False), default=None)
+def analyze_library(
+    library_db: str,
+    import_paths: tuple[str, ...],
+    sample_rate: int,
+    profile: str,
+    app_data_dir: str | None,
+) -> None:
+    """Import optional files/folders, then persist profile features in SQLite."""
     store = SqliteStore(Path(library_db))
     store.init_schema()
     library = LibraryService(store)
@@ -114,13 +128,21 @@ def analyze_library(library_db: str, import_paths: tuple[str, ...], sample_rate:
         else:
             library.import_file(path)
 
-    analysis = AnalysisService(store, sample_rate=sample_rate)
-    analyzed = 0
-    for track in store.list_tracks():
-        if not store.list_feature_views_for_owner(track.id):
-            analysis.analyze(track)
-            analyzed += 1
-    click.echo(f"Analyzed {analyzed} track(s) in {library_db}")
+    db_path = Path(library_db)
+    resolved_app_data_dir = (
+        Path(app_data_dir) if app_data_dir is not None else db_path.parent / "app_data"
+    )
+    service = LibraryAnalysisService(
+        store,
+        analysis_service=AnalysisService(store, sample_rate=sample_rate),
+        app_data_dir=resolved_app_data_dir,
+    )
+    result = service.analyze_library(profile=profile)
+    click.echo(
+        f"Analyzed {result.completed_count}/{result.requested_count} track(s) "
+        f"profile={result.profile.value} features={result.feature_count} failed={result.failed_count} "
+        f"in {library_db}"
+    )
 
 
 @main.command(name="index-library")
@@ -132,6 +154,12 @@ def analyze_library(library_db: str, import_paths: tuple[str, ...], sample_rate:
     type=click.Choice([feature_type.value for feature_type in FeatureType]),
 )
 @click.option(
+    "--profile",
+    type=click.Choice([profile.value for profile in AnalysisProfile]),
+    default=AnalysisProfile.MINIMAL.value,
+    show_default=True,
+)
+@click.option(
     "--owner-type",
     type=click.Choice([owner_type.value for owner_type in OwnerType]),
     default=OwnerType.TRACK.value,
@@ -141,6 +169,7 @@ def index_library(
     library_db: str,
     index_root: str | None,
     feature_type: tuple[str, ...],
+    profile: str,
     owner_type: str,
 ) -> None:
     """Build persisted vector indexes for SQLite feature rows."""
@@ -148,12 +177,15 @@ def index_library(
     store = SqliteStore(db_path)
     root = Path(index_root) if index_root is not None else db_path.parent / "app_data" / "indices"
     service = IndexService(store, index_root=root)
-    requested = feature_type or tuple(feature.value for feature in _default_track_feature_types())
-    for raw_feature_type in requested:
-        status = service.build_index(
-            FeatureType(raw_feature_type),
-            owner_type=OwnerType(owner_type),
+    statuses = (
+        tuple(
+            service.build_index(FeatureType(raw_feature_type), owner_type=OwnerType(owner_type))
+            for raw_feature_type in feature_type
         )
+        if feature_type
+        else service.build_profile(profile)
+    )
+    for status in statuses:
         click.echo(
             f"{status.feature_type.value}: indexed {status.feature_count} "
             f"{status.owner_type.value} row(s), backend={status.backend}, stale={status.stale}"
@@ -171,12 +203,16 @@ def index_library(
 )
 @click.option("--top-k", default=10, show_default=True, type=int)
 @click.option("--index-root", type=click.Path(file_okay=False), default=None)
+@click.option("--show-titles", is_flag=True, help="Show hydrated title/path metadata.")
+@click.option("--explain", is_flag=True, help="Show backend caveats and result caveats.")
 def search_library(
     library_db: str,
     query_id: str,
     mode: str,
     top_k: int,
     index_root: str | None,
+    show_titles: bool,
+    explain: bool,
 ) -> None:
     """Search persisted SQLite feature rows, using indexes when current."""
     db_path = Path(library_db)
@@ -193,10 +229,19 @@ def search_library(
         dimensions = ", ".join(
             f"{name}={score:.3f}" for name, score in sorted(result.dimension_scores.items())
         )
-        caveats = " ".join(result.retrieval_caveats)
+        owner_metadata = _hydrate_result_owner(store, result.owner_type, result.owner_id)
+        title = ""
+        if show_titles and owner_metadata:
+            title = f" title={owner_metadata['title']} path={owner_metadata['path']}"
+        caveats = ""
+        if explain:
+            all_caveats = (*result.caveats, *result.retrieval_caveats)
+            if all_caveats:
+                caveats = " caveats=" + " | ".join(dict.fromkeys(all_caveats))
         click.echo(
             f"{rank}. {result.owner_id} score={result.score:.3f} "
-            f"backend={result.search_backend} ({dimensions}) {caveats}".rstrip()
+            f"entity={result.matched_entity_type or result.owner_type.value} "
+            f"backend={result.search_backend} ({dimensions}){title}{caveats}".rstrip()
         )
 
 
@@ -265,12 +310,36 @@ def _vector_stats(prefix: str, values: list[float]) -> dict[str, float]:
     return {f"{prefix}_{index:02d}": value for index, value in enumerate(values)}
 
 
-def _default_track_feature_types() -> tuple[FeatureType, ...]:
-    return (
-        FeatureType.RHYTHM_GLOBAL,
-        FeatureType.HARMONY_CHROMA,
-        FeatureType.TIMBRE_MFCC_STATS,
-    )
+def _hydrate_result_owner(
+    store: SqliteStore,
+    owner_type: OwnerType,
+    owner_id: str,
+) -> dict[str, str]:
+    if owner_type is OwnerType.TRACK:
+        try:
+            track = store.get_track(owner_id)
+        except KeyError:
+            return {"title": owner_id, "path": owner_id}
+        return {"title": track.title or track.filepath.stem, "path": str(track.filepath)}
+
+    if owner_type is OwnerType.SOURCE:
+        try:
+            source = store.get_source(owner_id)
+            track = store.get_track(source.track_id)
+        except KeyError:
+            return {"title": owner_id, "path": owner_id}
+        title = f"{track.title or track.filepath.stem} / {source.source_label}"
+        return {"title": title, "path": str(track.filepath)}
+
+    if owner_type is OwnerType.STEM:
+        for track in store.list_tracks():
+            for stem in store.list_stems_for_track(track.id):
+                if stem.id == owner_id:
+                    title = f"{track.title or track.filepath.stem} / {stem.stem_type.value}"
+                    path = str(stem.artifact_path or track.filepath)
+                    return {"title": title, "path": path}
+
+    return {"title": owner_id, "path": owner_id}
 
 
 if __name__ == "__main__":

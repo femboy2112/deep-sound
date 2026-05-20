@@ -8,6 +8,7 @@ from enum import StrEnum
 
 from deep_sound.domain.corrections import clamp_score
 from deep_sound.domain.feature_view import FeatureType, OwnerType
+from deep_sound.domain.source import SourceType
 from deep_sound.services.correction_service import CorrectionService
 from deep_sound.services.feature_service import FeatureService
 from deep_sound.services.index_service import IndexService
@@ -305,6 +306,11 @@ class SimilarityService:
             except KeyError:
                 continue
             retrieval_owner_type = owner_type or query_view.owner_type
+            query_source_type = (
+                self._features.source_type_for_owner(query_id)
+                if retrieval_owner_type is OwnerType.SOURCE
+                else None
+            )
             indexed_ids: list[str] = []
             if self._index_service is not None:
                 query_vector = self._features.vector_for(query_view)
@@ -319,8 +325,13 @@ class SimilarityService:
             if indexed_ids:
                 for candidate_id in indexed_ids:
                     if candidate_id != query_id:
-                        candidate_ids.add(candidate_id)
-                        candidate_owner_types[candidate_id] = retrieval_owner_type
+                        self._add_compatible_candidate(
+                            candidate_ids,
+                            candidate_owner_types,
+                            candidate_id,
+                            retrieval_owner_type,
+                            query_source_type,
+                        )
                 continue
 
             used_scan = True
@@ -328,8 +339,13 @@ class SimilarityService:
             for view in self._features.list_by_type(feature_type, owner_type=retrieval_owner_type):
                 if view.owner_id == query_id:
                     continue
-                candidate_ids.add(view.owner_id)
-                candidate_owner_types[view.owner_id] = view.owner_type
+                self._add_compatible_candidate(
+                    candidate_ids,
+                    candidate_owner_types,
+                    view.owner_id,
+                    view.owner_type,
+                    query_source_type,
+                )
 
         backend = "index" if used_index and not used_scan else "scan"
         if used_index and used_scan:
@@ -340,6 +356,23 @@ class SimilarityService:
             backend=backend,
             caveats=tuple(sorted(caveats)),
         )
+
+    def _add_compatible_candidate(
+        self,
+        candidate_ids: set[str],
+        candidate_owner_types: dict[str, OwnerType],
+        candidate_id: str,
+        owner_type: OwnerType,
+        query_source_type: SourceType | None,
+    ) -> None:
+        if owner_type is OwnerType.SOURCE and query_source_type is not None:
+            candidate_source_type = self._features.source_type_for_owner(candidate_id)
+            if candidate_source_type is not None and not _source_types_compatible(
+                query_source_type, candidate_source_type
+            ):
+                return
+        candidate_ids.add(candidate_id)
+        candidate_owner_types[candidate_id] = owner_type
 
     def _normalize_weights(self, weights: dict[str, float]) -> dict[FeatureType, float]:
         if not weights:
@@ -412,6 +445,13 @@ def _source_result_metadata(
     if FeatureType.TIMBRE_EMBEDDING.value in dimensions:
         return ("source timbre proxy", ("Source timbre evidence is probabilistic.",))
     return ("source features", ("Source-level match is probabilistic.",))
+
+
+def _source_types_compatible(query_type: SourceType, candidate_type: SourceType) -> bool:
+    if query_type is candidate_type:
+        return True
+    compatible_groups = ({SourceType.PITCHED_HARMONIC, SourceType.MELODIC},)
+    return any(query_type in group and candidate_type in group for group in compatible_groups)
 
 
 @dataclass(frozen=True, slots=True)

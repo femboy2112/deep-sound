@@ -80,3 +80,11 @@ Advanced dimensions remain separate, normalized similarity evidence. Phase 5 mus
 Phase 6 promotes real-library search over persisted SQLite feature views. Indexes are an acceleration layer, not the source of truth: feature rows remain canonical, missing or stale indexes fall back to persisted scans, and result metadata must disclose the backend used.
 
 The beta remains dependency-light. Core verification may use the existing NumPy fallback in the FAISS wrapper and must not require FAISS, PySide, Demucs, learned embeddings, cloud services, packaging installers, or heavy MIR extras.
+
+## 2026-05-20 — Phase 7 user-facing beta acceptance boundary
+
+Phase 7 hardens the existing indexed-search backend into a repeatable library workflow. Analysis profiles are explicit: `minimal` keeps the full-mix Phase 0 feature set, `searchable` adds production and structure feature families, and `source_aware` adds a core-light fake-provider source path for acceptance tests without requiring Demucs.
+
+Analysis and indexing must be idempotent. Feature views stay canonical in SQLite, reruns replace or skip equivalent rows instead of creating duplicates, failed files are recorded per track or job, and missing or stale indexes disclose caveats while falling back to trusted scans.
+
+The user-facing beta remains dependency-light. CLI and import-safe UI controller seams may expose import, analyze, index, search, progress, stale-index warnings, clip/window, waveform/cache, and feedback DTOs, but default verification must not require FAISS, PySide, Demucs, learned embeddings, cloud services, installers, or heavy MIR extras.

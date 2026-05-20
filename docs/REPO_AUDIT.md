@@ -1,178 +1,87 @@
 # Repo Audit
 
-This audit inventories the current Deep-Sound repository as of the Codex harness pass on 2026-05-19. It is intentionally repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
+This audit inventories the Deep-Sound repository after the Phase 7 beta acceptance hardening pass on 2026-05-20. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
 
 ## Executive Summary
 
-- The repository is in an early scaffold state with `ACTIVE_PHASE: 0`.
-- The only implemented product behavior is the Phase 0 tempo-analysis CLI path.
-- Most services and infrastructure components are spec-shaped stubs that intentionally defer real work to later FILE_PLAN rows.
-- The repo already had a mature Claude-oriented control plane under `.claude/`, but no Codex-native mirror surface.
-- Verification and repair scripts are stronger than the product surface itself; they are the right backend to reuse for the new harness.
-- The main control-plane gap before this pass was asymmetry: Codex had `AGENTS.md` but no repo-local agents, skills, or hooks comparable to `.claude/*`.
+- `ACTIVE_PHASE: 7`; all Phase 0 through Phase 7 rows are complete except this closeout row while this audit is being written.
+- The runtime now covers a dependency-light real-library beta path: import, profile analysis, profile indexing, indexed/scan search fallback, hydrated CLI output, source-aware fake-provider analysis, clip/window storage, waveform cache DTOs, and import-safe UI workflow DTO seams.
+- Core verification remains intentionally light: no required FAISS, PySide, Demucs, learned embeddings, cloud services, packaging installers, or heavy MIR extras.
+- Search and MIR-facing outputs continue to expose confidence/caveats instead of definitive labels.
+- `.claude/` and `.codex/` remain dual control-plane surfaces over the same shared scripts.
 
 ## Risk Summary
 
-- Product/runtime risk: high. Most core services are placeholders.
-- Spec-drift risk: medium. The spec is detailed, while the implemented runtime surface is narrow.
-- Agent-ops risk before this pass: medium-high. One orchestration surface existed, the other did not.
-- Verification risk: medium. `make status` and other `uv`-backed flows depend on writable cache paths in the execution environment.
+- Product/runtime risk: medium. The beta workflow is usable through CLI/service seams, but full desktop interaction, commercial packaging, and production-quality MIR models remain future work.
+- Spec-drift risk: medium. Phase 7 is repo-local build-plan scope layered on top of the spec; its acceptance boundary is documented in `docs/build/PHASES.md` and `docs/build/DECISIONS.md`.
+- Dependency risk: low for default gates. Optional FAISS/PySide/Demucs paths remain isolated.
+- Data lifecycle risk: medium. Feature reruns are now idempotent for canonical views, but richer migration/retention policy is still future work.
+- UI risk: medium. DTO/controller seams are import-safe, but full PySide wiring and manual desktop QA remain incomplete.
 
-## File Inventory
+## Current Product Surface
 
-### Governance and root metadata
+| Area | Status | Notes |
+|---|---|---|
+| Library import | Active | `LibraryService` imports files/folders, dedupes by hash, records failed imports, and preserves originals. |
+| Analysis profiles | Active | `LibraryAnalysisService` supports `minimal`, `searchable`, and `source_aware` profiles. |
+| Feature lifecycle | Active | SQLite has feature upsert/replacement APIs, track analysis status updates, and failed-analysis job records. |
+| Searchable profile | Active | `searchable` materializes full-mix rhythm/chroma/MFCC plus production texture and structure features. |
+| Source-aware profile | Beta seam | Uses `FakeSeparationProvider` in core tests; Demucs remains optional. |
+| Indexing | Active | `IndexService.build_profile()` builds profile-matched indexes using FAISS wrapper or NumPy fallback. |
+| Search retrieval | Active | `SimilarityService` separates retrieval/rerank, discloses backend, falls back to scans, and filters incompatible source types for source searches. |
+| CLI workflow | Active | `analyze-library --profile`, `index-library --profile`, and `search-library --show-titles --explain` cover the beta path. |
+| Clip/window | Storage seam | `ClipWindow` and SQLite `clip_windows` support clip-owned feature rows. |
+| Waveform/cache | DTO/service seam | `WaveformService` writes JSON peak/RMS cache artifacts without PySide. |
+| UI workflow | DTO seam | `ui/library_workflow.py` maps import/analyze/index/search/progress/warnings/results/feedback DTOs without importing PySide. |
 
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `AGENTS.md` | Codex-facing repo instructions | Active | Good baseline rules; lacked a full Codex harness surface. |
-| `CLAUDE.md` | Claude build-loop contract | Active | Strongest existing orchestration entrypoint. |
-| `README.md` | Human overview and quickstart | Active | Accurate scaffold framing; should now mention dual-surface harness docs. |
-| `LICENSE` | MIT license | Stable | No action needed. |
-| `Makefile` | Operator shortcuts | Active | Good shared backend entrypoint; suitable place for harness review target. |
-| `pyproject.toml` | Package metadata and deps | Active | Phase-based extras are well-scoped. |
-| `ruff.toml` | Formatting and lint policy | Active | Clean and minimal. |
-| `.pre-commit-config.yaml` | Pre-commit gates | Active | Mirrors verify policy. |
-| `.gitignore` | Ignore policy | Active | Correctly ignores `.build/` and `app_data/`. |
-| `.python-version` | Python version pin | Stable | Matches project requirements. |
-| `uv.lock` | Locked dependency graph | Active | Shared reproducibility surface. |
+## Key Files Added Or Advanced In Phase 7
 
-### Product spec and distilled docs
+| Path | Purpose |
+|---|---|
+| `src/deep_sound/services/library_analysis_service.py` | Thin profile orchestrator over existing Library/Analysis/Source services. |
+| `src/deep_sound/domain/clip.py` | User-selected clip/window domain object. |
+| `src/deep_sound/services/waveform_service.py` | Waveform JSON cache artifact writer and clip/waveform DTOs. |
+| `src/deep_sound/ui/library_workflow.py` | Import-safe workflow/controller DTO seam. |
+| `tests/test_phase7_*.py` | Focused Phase 7 storage, profile, CLI, index, source, clip, waveform, UI, integration, and smoke coverage. |
 
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `docs/SPEC.md` | Authoritative product spec | Authoritative | Detailed and stable; must remain untouched unless explicitly requested. |
-| `docs/ARCHITECTURE.md` | Layering summary | Active | Good distillation of service boundaries. |
-| `docs/DATA_MODEL.md` | Data-model summary | Active | Captures confidence and artifact-versioning rules. |
-| `docs/PIPELINE.md` | Pipeline summary | Active | Clear analyzer-routing constraints. |
-| `docs/build/AGENT_CONTRACT.md` | Shared build-loop contract | New | Frontend-neutral operational contract for Claude and Codex. |
-| `docs/AGENT_HARNESS_SPEC.md` | Repo-local harness spec | New | Added to formalize the dual-surface control plane. |
-| `docs/REPO_AUDIT.md` | Repo-wide audit | New | Added to satisfy the requested deep repo analysis. |
+## Governance And Control Plane
 
-### Build-plan docs
+| Path | Status | Notes |
+|---|---|---|
+| `AGENTS.md` | Active | Codex-facing repo contract; still matches the build-loop rules. |
+| `.codex/README.md` | Active | Codex-local entrypoint over shared scripts. |
+| `.codex/CODEX_AGENT_MAP.md` | Active | Role/delegation map used by current runs. |
+| `.claude/` | Active | Claude-oriented commands/agents/hooks remain available. |
+| `docs/AGENT_HARNESS_SPEC.md` | Active | Shared control-plane contract. |
+| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 7 acceptance boundary. |
+| `docs/build/FILE_PLAN.md` | Active | Mutated only through `scripts/update_plan.py`. |
+| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 7. |
+| `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 7 entries are current. |
+| `scripts/toolset_review.py` | Active | Suggest-only review; no auto-edits. |
 
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `docs/build/PHASES.md` | Phase ceiling and exit criteria | Active | Current active phase is 0. |
-| `docs/build/FILE_PLAN.md` | Living file backlog | Active | Product backlog is well-structured and intentionally authoritative. |
-| `docs/build/DECISIONS.md` | ADR-lite decisions | Active | Correct place to record harness-priority override. |
-| `docs/build/BUILD_LOG.md` | Append-only execution log | Active | Correct place to document this control-plane pass. |
+## Manual QA Checklist
 
-### Claude control plane
+Use a small local folder with at least two valid audio files and one intentionally broken `.wav` text file.
 
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `.claude/settings.json` | Claude permissions and hooks | Active | Most complete existing control-plane config. |
-| `.claude/commands/build.md` | Build loop command | Active | Encodes FILE_PLAN-first execution. |
-| `.claude/commands/continue.md` | Build alias | Active | Thin alias to build. |
-| `.claude/commands/phase.md` | Phase print/promote | Active | Correctly avoids silent phase jumps. |
-| `.claude/commands/repair.md` | Repair loop command | Active | Good bounded repair flow. |
-| `.claude/commands/replan.md` | Replan proposal flow | Active | Proposal-only behavior is correct. |
-| `.claude/commands/status.md` | Status command | Active | Good read-only surface. |
-| `.claude/commands/verify.md` | Verify command | Active | Good summarized verification surface. |
-| `.claude/agents/build-engineer.md` | Row-scoped implementer | Active | Strong scope discipline. |
-| `.claude/agents/mir-domain-expert.md` | MIR/spec reviewer | Active | Useful model for Codex review role. |
-| `.claude/agents/planner.md` | Plan-maintenance role | Active | Proposal-first behavior is good. |
-| `.claude/agents/repair-engineer.md` | Minimal repair role | Active | Strong repair boundaries. |
-| `.claude/agents/verifier.md` | Read-only verification role | Active | Good diagnostic role. |
-| `.claude/skills/audio-pipeline.md` | Analyzer guidance | Active | High-signal domain skill. |
-| `.claude/skills/mir-confidence-policy.md` | Confidence-policy skill | Active | Cross-cutting and important. |
-| `.claude/skills/pyside-ui.md` | UI guidance | Active | Future-facing for Phase 1. |
-| `.claude/skills/source-separation.md` | Stem/source skill | Active | Future-facing for Phase 2+. |
-| `.claude/skills/vector-search.md` | Similarity/index guidance | Active | Future-facing for similarity work. |
-| `.claude/hooks/session_start_bootstrap.sh` | State/bootstrap hook | Active | Good read-only session primer. |
-| `.claude/hooks/stop_self_repair.sh` | Verify-and-brief hook | Active | Strong repair trigger; useful compatibility reference. |
+1. Run `deep-sound analyze-library --library-db /tmp/deep-sound-beta.sqlite --import-path <folder> --profile searchable`.
+2. Confirm output reports completed tracks, `profile=searchable`, and a nonzero feature count.
+3. Run the same analyze command again and confirm it succeeds without duplicate feature errors.
+4. Run `deep-sound index-library --library-db /tmp/deep-sound-beta.sqlite --profile searchable`.
+5. Confirm rhythm, chroma, MFCC, production, and structure index lines are printed.
+6. Pick a query track id from the SQLite library and run `deep-sound search-library --library-db /tmp/deep-sound-beta.sqlite --query-id <id> --mode rhythm --show-titles --explain`.
+7. Confirm result rows show title/path metadata, `entity=track`, backend, per-dimension scores, and caveats when a scan fallback is used.
+8. Run a `source_aware` analysis on a tiny test library only when fake-provider behavior is desired; do not install Demucs for default QA.
+9. Open the generated `app_data/waveforms/*.json` cache in a text viewer and confirm it records track id, version, sample rate, duration, and points.
 
-### Codex control plane
+## Remaining Gaps
 
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `.codex/README.md` | Codex entrypoint and workflow | New | Added in this pass. |
-| `.codex/CODEX_AGENT_MAP.md` | Role/delegation map | New | Added in this pass. |
-| `.codex/agents/build-engineer.md` | Codex row implementer | New | Mirrors row-scoped discipline. |
-| `.codex/agents/harness-reviewer.md` | Repo-control-plane reviewer | New | Added for harness-specific reviews. |
-| `.codex/agents/mir-reviewer.md` | MIR/spec reviewer | New | Codex counterpart to Claude MIR role. |
-| `.codex/agents/planner.md` | Replan/audit role | New | Proposal-oriented planning role. |
-| `.codex/agents/repair-engineer.md` | Minimal repair role | New | Mirrors repair discipline. |
-| `.codex/agents/verifier.md` | Read-only verifier | New | Mirrors verification discipline. |
-| `.codex/skills/audio-pipeline/SKILL.md` | Audio-analysis skill | New | Shared rules adapted for Codex triggering. |
-| `.codex/skills/deep-sound-build-loop/SKILL.md` | Build-loop orchestration skill | New | Added to give Codex a repo-execution entry skill. |
-| `.codex/skills/harness-self-review/SKILL.md` | Harness-review skill | New | Added for suggest-only control-plane review. |
-| `.codex/skills/harness-maintenance/SKILL.md` | Harness and review skill | New | New repo-control-plane skill. |
-| `.codex/skills/mir-confidence-policy/SKILL.md` | Confidence-policy skill | New | Required for probabilistic outputs. |
-| `.codex/skills/pyside-ui/SKILL.md` | UI guidance skill | New | Future-facing Phase 1 UI skill. |
-| `.codex/skills/source-separation/SKILL.md` | Stem/source skill | New | Future-facing Phase 2+ skill. |
-| `.codex/skills/vector-search/SKILL.md` | Similarity/index skill | New | Future-facing Codex guidance. |
-| `.codex/hooks/session_start_status.sh` | Status hook | New | Read-only session state surfacing. |
-| `.codex/hooks/stop_self_review.sh` | Suggest-only review hook | New | Runs the toolset review script. |
+- Full PySide desktop workflow wiring is not implemented; DTOs are ready but widgets/controllers need future rows.
+- Source-aware acceptance uses fake copied stems for default verification. Real separation quality remains gated behind optional Demucs work.
+- Clip search has domain/storage/cache seams but not full audio playback or clip-specific analyzer routing in the UI.
+- `scripts/toolset_review.py` is intentionally shallow and suggest-only; it should not be treated as a complete governance audit.
 
-### Shared automation scripts
+## Closeout Checks
 
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `scripts/bootstrap.sh` | Install `uv`, sync dev deps | Active | Good bootstrap path. |
-| `scripts/print_build_contract.py` | Shared contract printer | New | Small helper to surface the common operator contract. |
-| `scripts/session_start.py` | Shared startup summary | New | Frontend-neutral status bootstrap. |
-| `scripts/status.py` | Read-only plan status | Active | Safe before dependency sync; valuable shared backend. |
-| `scripts/update_plan.py` | Controlled FILE_PLAN mutator | Active | Correctly serializes writes and enforces the no-direct-edit rule. |
-| `scripts/verify.py` | Structured verification runner | Active | Strong shared gate backend. |
-| `scripts/repair.py` | Repair-brief generator | Active | Strong failure summarization backend. |
-| `scripts/toolset_review.py` | Suggest-only harness review | New | Added for Codex/Claude-compatible control-plane feedback. |
-
-### Runtime package surface
-
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `src/deep_sound/__init__.py` | Package init/version | Scaffolded | Fine for current phase. |
-| `src/deep_sound/cli.py` | Phase 0 CLI entrypoint | Implemented | Only real end-user path today. |
-| `src/deep_sound/domain/confidence.py` | Confidence value object | Implemented | One of the strongest completed domain modules. |
-| `src/deep_sound/domain/track.py` | Track model | Stub | Spec-shaped, intentionally partial. |
-| `src/deep_sound/domain/stem.py` | Stem model | Stub | Correct confidence requirement, no real pipeline yet. |
-| `src/deep_sound/domain/source.py` | Source model | Stub | Good type routing groundwork. |
-| `src/deep_sound/domain/feature_view.py` | Feature-view model | Stub-plus | Good artifact metadata fields. |
-| `src/deep_sound/domain/__init__.py` | Domain package init | Minimal | Pure packaging surface. |
-| `src/deep_sound/services/__init__.py` | Services package init | Minimal | Pure packaging surface. |
-| `src/deep_sound/services/analysis_service.py` | Analysis orchestrator | Stub | Important future boundary, not yet implemented. |
-| `src/deep_sound/services/explanation_service.py` | Explanation surface | Stub | Needed in Phase 1. |
-| `src/deep_sound/services/feature_service.py` | Feature storage service | Stub | Next important Phase 0 service dependency chain. |
-| `src/deep_sound/services/library_service.py` | Library import surface | Stub | Future Phase 1 work. |
-| `src/deep_sound/services/similarity_service.py` | Search/rerank surface | Stub | Important future Phase 0 row. |
-| `src/deep_sound/services/source_service.py` | Stem/source service | Stub | Correctly deferred to later phases. |
-| `src/deep_sound/infra/__init__.py` | Infra package init | Minimal | Pure packaging surface. |
-| `src/deep_sound/infra/audio_decoder.py` | Decode boundary | Stub | Correct spec intent, no implementation yet. |
-| `src/deep_sound/infra/analyzers/__init__.py` | Analyzer package init | Minimal | Fine. |
-| `src/deep_sound/infra/analyzers/tempo_librosa.py` | Tempo analyzer | Implemented | Current core product capability. |
-| `src/deep_sound/infra/index/__init__.py` | Index package init | Minimal | Fine. |
-| `src/deep_sound/infra/index/faiss_index.py` | Vector-index boundary | Stub | Correctly gated behind Phase 1. |
-| `src/deep_sound/infra/storage/__init__.py` | Storage package init | Minimal | Fine. |
-| `src/deep_sound/infra/storage/sqlite_store.py` | SQLite store boundary | Stub | Important future infra row. |
-
-### Tests
-
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `tests/__init__.py` | Test package init | Minimal | Fine. |
-| `tests/conftest.py` | Shared fixtures | Implemented | Strong generated audio fixture strategy. |
-| `tests/test_analyze.py` | Tempo CLI/analyzer tests | Implemented | Covers the only real product path. |
-| `tests/test_cli.py` | CLI smoke tests | Implemented | Narrow but appropriate. |
-| `tests/test_confidence_bands.py` | Confidence boundary tests | Implemented | Good guardrail for a core invariant. |
-| `tests/fixtures/README.md` | Fixture policy | Active | Keeps binary fixtures out of git. |
-
-### CI and git-managed metadata
-
-| Path | Purpose | Maturity | Notes |
-|---|---|---|---|
-| `.github/workflows/ci.yml` | CI verify workflow | Active | Mirrors local verify pipeline. |
-
-## Control-Plane Gaps Found
-
-Before this pass, the main gaps were:
-
-1. No Codex-native skill/agent/hook surface despite explicit Codex usage.
-2. No suggest-only self-review path for recommending harness additions.
-3. No harness spec documenting when repo-control-plane work may temporarily override normal FILE_PLAN picking.
-
-## Recommended Near-Term Focus
-
-- Finish the Codex harness and keep it thin by reusing `scripts/`.
-- Return to the Phase 0 FILE_PLAN chain starting with `P0-014`.
-- Keep the repo audit updated only when the control plane changes materially; it should not become a changelog.
+- `python3 scripts/verify.py`
+- `python3 scripts/status.py`
+- `python3 scripts/toolset_review.py`

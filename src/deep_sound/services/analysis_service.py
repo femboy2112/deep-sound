@@ -63,7 +63,7 @@ class AnalysisService:
             },
             confidence=tempo.confidence,
         )
-        self._store.add_feature_view(rhythm)
+        self._store.replace_feature_view_for_owner(rhythm)
         self._emit_progress("rhythm.global", 1.0 / 3.0)
 
         chroma = summarize_chroma(track.filepath, sample_rate=self._sample_rate)
@@ -78,7 +78,7 @@ class AnalysisService:
             stats=_vector_stats("chroma", chroma.chroma),
             confidence=chroma.confidence,
         )
-        self._store.add_feature_view(harmony)
+        self._store.replace_feature_view_for_owner(harmony)
         self._emit_progress("harmony.chroma", 2.0 / 3.0)
 
         mfcc = summarize_mfcc(track.filepath, sample_rate=self._sample_rate)
@@ -93,7 +93,7 @@ class AnalysisService:
             stats=_vector_stats("mfcc", mfcc.mfcc),
             confidence=mfcc.confidence,
         )
-        self._store.add_feature_view(timbre)
+        self._store.replace_feature_view_for_owner(timbre)
         self._emit_progress("timbre.mfcc_stats", 1.0)
 
         return [rhythm, harmony, timbre]
@@ -180,7 +180,7 @@ class AnalysisService:
             return []
 
         for view in views:
-            self._store.add_feature_view(view)
+            self._store.replace_feature_view_for_owner(view)
         return views
 
     def analyze_source(self, source: Source) -> list[FeatureView]:
@@ -202,7 +202,7 @@ class AnalysisService:
             stats=summary.stats,
             confidence=summary.confidence,
         )
-        self._store.add_feature_view(view)
+        self._store.replace_feature_view_for_owner(view)
         return view
 
     def structure_feature_view(self, track: Track) -> FeatureView:
@@ -238,7 +238,7 @@ class AnalysisService:
             stats=stats,
             confidence=Confidence(confidence_value),
         )
-        self._store.add_feature_view(view)
+        self._store.replace_feature_view_for_owner(view)
         return view
 
     def analyze_melody_contour(self, source: Source) -> FeatureView:
@@ -262,7 +262,7 @@ class AnalysisService:
             stats=summary.contour,
             confidence=Confidence(min(summary.confidence.value, source.confidence.value)),
         )
-        self._store.add_feature_view(view)
+        self._store.replace_feature_view_for_owner(view)
         return view
 
     def analyze_source_timbre(self, source: Source) -> FeatureView:
@@ -290,7 +290,7 @@ class AnalysisService:
             stats=_vector_stats("timbre", summary.mfcc),
             confidence=Confidence(min(summary.confidence.value, source.confidence.value)),
         )
-        self._store.add_feature_view(view)
+        self._store.replace_feature_view_for_owner(view)
         return view
 
     def infer_source_chords(self, source: Source) -> list[ChordEvent]:
@@ -299,6 +299,9 @@ class AnalysisService:
             raise ValueError(
                 f"Chord analysis is not enabled for source type {source.source_type.value}"
             )
+        existing = self._store.list_chord_events_for_owner(source.id)
+        if existing:
+            return existing
         stem = self._stem_for_source(source)
         if stem.artifact_path is None:
             raise ValueError(f"Source {source.id} parent stem has no artifact_path")
@@ -344,7 +347,7 @@ class AnalysisService:
         )
         views = [sequence, change]
         for view in views:
-            self._store.add_feature_view(view)
+            self._store.replace_feature_view_for_owner(view)
         return views
 
     def _stem_for_source(self, source: Source) -> Stem:

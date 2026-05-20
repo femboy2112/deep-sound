@@ -57,6 +57,8 @@ class SourceService:
             raise RuntimeError("No separation provider configured")
         output_dir = self._app_data_dir / "stems" / track.id
         artifacts = self._separation_provider.separate(track.filepath, output_dir)
+        existing_stems = {stem.id: stem for stem in self._store.list_stems_for_track(track.id)}
+        existing_source_ids = {source.id for source in self._store.list_sources_for_track(track.id)}
         stems: list[Stem] = []
         for artifact in artifacts:
             stem = Stem(
@@ -70,9 +72,14 @@ class SourceService:
                 params_hash=artifact.params_hash,
                 input_hash=artifact.input_hash,
             )
-            self._store.add_stem(stem)
-            self._store.add_source(source_from_stem(stem))
-            stems.append(stem)
+            persisted_stem = existing_stems.get(stem.id)
+            if persisted_stem is None:
+                persisted_stem = self._store.add_stem(stem)
+            source = source_from_stem(persisted_stem)
+            if source.id not in existing_source_ids:
+                self._store.add_source(source)
+                existing_source_ids.add(source.id)
+            stems.append(persisted_stem)
         return stems
 
     def list_sources(self, track_id: str) -> list[Source]:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
+from deep_sound.domain.source import SourceType
 from deep_sound.infra.storage.sqlite_store import SqliteStore
 
 
@@ -89,6 +90,14 @@ class FeatureService:
         if not view.stats:
             return []
         return [view.stats[key] for key in sorted(view.stats)]
+
+    def source_type_for_owner(self, owner_id: str) -> SourceType | None:
+        if self._store is None:
+            return None
+        try:
+            return self._store.get_source(owner_id).source_type
+        except KeyError:
+            return None
 
     def _validate_stats(self, view: FeatureView) -> None:
         for key, value in view.stats.items():

@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 6
+**ACTIVE_PHASE:** 7
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -120,3 +120,19 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - Expose import/analyze/index/search flows through CLI/service/UI DTO seams without requiring FAISS, PySide, Demucs, or MIR extras.
 
 **FILE_PLAN ids:** `P6-001` .. `P6-0NN`.
+
+---
+
+## Phase 7 — User-Facing Beta Acceptance Hardening
+
+**Goal:** Turn indexed search into a coherent real-library workflow for beta acceptance.
+
+**Required capabilities:**
+- Analyze imported libraries through explicit `minimal`, `searchable`, and `source_aware` profiles.
+- Re-run analysis and indexing idempotently without duplicate feature failures.
+- Build profile-matched indexes while keeping persisted feature rows canonical.
+- Search with hydrated track/source metadata, backend disclosure, caveats, and per-dimension scores.
+- Add clip/window, waveform/cache, and import-safe UI controller seams without requiring PySide at import time.
+- Keep fake-provider source-aware acceptance paths dependency-light; Demucs, FAISS, PySide, learned embeddings, cloud services, and heavy MIR extras remain optional.
+
+**FILE_PLAN ids:** `P7-001` .. `P7-0NN`.

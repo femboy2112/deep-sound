@@ -32,6 +32,7 @@ def test_init_schema_creates_phase1_tables(tmp_path: Path) -> None:
     assert {
         "tracks",
         "sections",
+        "clip_windows",
         "stems",
         "sources",
         "source_activity",

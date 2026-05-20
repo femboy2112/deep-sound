@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
+from deep_sound.domain.clip import ClipWindow
 from deep_sound.domain.confidence import Confidence
 from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
 from deep_sound.domain.harmony import ChordEvent, HarmonicOwnerType, NoteEvent
@@ -165,6 +166,32 @@ class SqliteStore:
                 (track_id,),
             ).fetchall()
         return [_section_from_row(row) for row in rows]
+
+    def add_clip_window(self, clip: ClipWindow) -> ClipWindow:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO clip_windows (id, track_id, start_sec, end_sec, label)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (clip.id, clip.track_id, clip.start_sec, clip.end_sec, clip.label),
+            )
+        return self.get_clip_window(clip.id)
+
+    def get_clip_window(self, clip_id: str) -> ClipWindow:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM clip_windows WHERE id = ?", (clip_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"ClipWindow not found: {clip_id}")
+        return _clip_window_from_row(row)
+
+    def list_clip_windows_for_track(self, track_id: str) -> list[ClipWindow]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM clip_windows WHERE track_id = ? ORDER BY start_sec ASC, id ASC",
+                (track_id,),
+            ).fetchall()
+        return [_clip_window_from_row(row) for row in rows]
 
     def add_stem(self, stem: Stem) -> Stem:
         with self._connect() as conn:
@@ -340,30 +367,39 @@ class SqliteStore:
 
     def add_feature_view(self, view: FeatureView) -> FeatureView:
         with self._connect() as conn:
+            _insert_feature_view(conn, view)
+        return view
+
+    def upsert_feature_view(self, view: FeatureView) -> FeatureView:
+        """Insert or replace a feature view by stable id.
+
+        Profile reruns use this when the caller owns the deterministic feature
+        id. Existing raw rows with other ids are left untouched.
+        """
+
+        with self._connect() as conn:
+            conn.execute("DELETE FROM feature_views WHERE id = ?", (view.id,))
+            _insert_feature_view(conn, view)
+        return self.get_feature_view(view.id)
+
+    def replace_feature_view_for_owner(self, view: FeatureView) -> FeatureView:
+        """Replace the canonical feature row for an owner/type pair.
+
+        `add_feature_view` intentionally stays append-like for legacy tests and
+        audit visibility. Profile orchestration should call this method to make
+        re-analysis idempotent for canonical feature families.
+        """
+
+        with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO feature_views (
-                    id, owner_type, owner_id, feature_type, vector_path,
-                    symbolic_json, stats_json, algorithm, algorithm_version,
-                    params_hash, confidence
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                DELETE FROM feature_views
+                WHERE owner_type = ? AND owner_id = ? AND feature_type = ?
                 """,
-                (
-                    view.id,
-                    view.owner_type.value,
-                    view.owner_id,
-                    view.feature_type.value,
-                    None if view.vector_path is None else str(view.vector_path),
-                    view.symbolic_json,
-                    json.dumps(view.stats, sort_keys=True),
-                    view.algorithm,
-                    view.algorithm_version,
-                    view.params_hash,
-                    None if view.confidence is None else view.confidence.value,
-                ),
+                (view.owner_type.value, view.owner_id, view.feature_type.value),
             )
-        return view
+            _insert_feature_view(conn, view)
+        return self.get_feature_view(view.id)
 
     def get_feature_view(self, view_id: str) -> FeatureView:
         with self._connect() as conn:
@@ -599,6 +635,40 @@ class SqliteStore:
             rows = conn.execute(sql, params).fetchall()
         return [_job_from_row(row) for row in rows]
 
+    def update_track_analysis_status(self, track_id: str, status: str) -> Track:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE tracks
+                SET analysis_status = ?
+                WHERE id = ?
+                """,
+                (status, track_id),
+            )
+            if cursor.rowcount == 0:
+                raise KeyError(f"Track not found: {track_id}")
+        return self.get_track(track_id)
+
+    def record_failed_analysis_job(
+        self,
+        *,
+        target_type: str,
+        target_id: str,
+        error_message: str,
+        job_type: str = "analyze_track",
+        mark_track_failed: bool = True,
+    ) -> JobRecord:
+        if mark_track_failed and target_type == "track":
+            self.update_track_analysis_status(target_id, "failed")
+        return self.create_job(
+            job_type=job_type,
+            target_type=target_type,
+            target_id=target_id,
+            status="failed",
+            progress=1.0,
+            error_message=error_message,
+        )
+
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -619,6 +689,32 @@ def _track_from_row(row: sqlite3.Row) -> Track:
         import_status=str(row["import_status"]),
         analysis_status=str(row["analysis_status"]),
         created_at=str(row["created_at"]),
+    )
+
+
+def _insert_feature_view(conn: sqlite3.Connection, view: FeatureView) -> None:
+    conn.execute(
+        """
+        INSERT INTO feature_views (
+            id, owner_type, owner_id, feature_type, vector_path,
+            symbolic_json, stats_json, algorithm, algorithm_version,
+            params_hash, confidence
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            view.id,
+            view.owner_type.value,
+            view.owner_id,
+            view.feature_type.value,
+            None if view.vector_path is None else str(view.vector_path),
+            view.symbolic_json,
+            json.dumps(view.stats, sort_keys=True),
+            view.algorithm,
+            view.algorithm_version,
+            view.params_hash,
+            None if view.confidence is None else view.confidence.value,
+        ),
     )
 
 
@@ -646,6 +742,16 @@ def _section_from_row(row: sqlite3.Row) -> SectionRecord:
         label=str(row["label"]),
         confidence=Confidence(float(row["confidence"])),
         source=str(row["source"]),
+    )
+
+
+def _clip_window_from_row(row: sqlite3.Row) -> ClipWindow:
+    return ClipWindow(
+        id=str(row["id"]),
+        track_id=str(row["track_id"]),
+        start_sec=float(row["start_sec"]),
+        end_sec=float(row["end_sec"]),
+        label=_optional_str(row["label"]),
     )
 
 
@@ -837,6 +943,18 @@ CREATE TABLE IF NOT EXISTS sections (
     source TEXT NOT NULL CHECK (source IN ('auto', 'user')),
     CHECK (end_sec >= start_sec)
 );
+
+CREATE TABLE IF NOT EXISTS clip_windows (
+    id TEXT PRIMARY KEY,
+    track_id TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+    start_sec REAL NOT NULL,
+    end_sec REAL NOT NULL,
+    label TEXT,
+    CHECK (start_sec >= 0.0),
+    CHECK (end_sec > start_sec)
+);
+
+CREATE INDEX IF NOT EXISTS idx_clip_windows_track_id ON clip_windows(track_id);
 
 CREATE TABLE IF NOT EXISTS stems (
     id TEXT PRIMARY KEY,

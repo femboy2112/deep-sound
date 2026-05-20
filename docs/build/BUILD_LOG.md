@@ -4,6 +4,38 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 7 user-facing beta acceptance hardening
+
+- **Agent:** Codex
+- **Scope:** Implement dependency-light beta acceptance workflow hardening.
+- **Rows touched:** P7-003 .. P7-015 → DONE.
+- **Changes:**
+  - Added rerun-safe SQLite feature lifecycle APIs, track analysis status updates, and failed-analysis job recording.
+  - Added `LibraryAnalysisService` for `minimal`, `searchable`, and `source_aware` profiles.
+  - Wired CLI profile analysis/indexing and hydrated search output with entity/backend/dimension/caveat metadata.
+  - Added fake-provider source-aware profile flow, source-compatible indexed retrieval, clip/window storage, waveform cache DTOs, and import-safe UI workflow DTOs.
+  - Added Phase 7 integration and 100-track synthetic smoke coverage with partial-failure handling.
+  - Refreshed `docs/REPO_AUDIT.md` with the current Phase 7 product surface and manual QA checklist.
+- **Verification:**
+  - `python3 scripts/verify.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/toolset_review.py`
+- **Notes:**
+  - Core verification remains dependency-light and does not require FAISS, PySide, Demucs, learned embeddings, cloud services, installers, or heavy MIR extras.
+
+## 2026-05-20 — Phase 7 beta acceptance opening
+
+- **Agent:** Codex
+- **Scope:** Open Phase 7 user-facing beta acceptance hardening.
+- **Rows touched:** P7-001, P7-002 → DONE.
+- **Changes:**
+  - Added Phase 7 FILE_PLAN rows through `scripts/update_plan.py`.
+  - Promoted `ACTIVE_PHASE` from 6 to 7.
+  - Documented the Phase 7 beta-acceptance boundary for explicit profiles, idempotent reruns, dependency-light source-aware acceptance, and import-safe UI/controller seams.
+- **Verification:**
+  - `uv run pytest tests/test_update_plan.py`
+  - `python3 scripts/status.py`
+
 ## 2026-05-20 — Phase 6 indexed library beta
 
 - **Agent:** Codex
@@ -186,8 +218,6 @@ Append-only journal of build sessions. Newest entries at the top.
   - `python3 scripts/verify.py`
 - **Notes:**
   - Phase 0 remains in-memory and read-only over original audio files; SQLite, FAISS, and UI work remain Phase 1.
-
----
 
 ## 2026-05-20 — Phase 0 chroma analyzer
 

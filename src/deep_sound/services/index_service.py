@@ -12,8 +12,39 @@ from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
 from deep_sound.infra.index.faiss_index import INDEX_VERSION, FaissIndex
 from deep_sound.infra.storage.sqlite_store import SimilarityIndexRecord, SqliteStore
 from deep_sound.services.feature_service import FeatureService
+from deep_sound.services.library_analysis_service import AnalysisProfile, normalize_analysis_profile
 
 INDEX_SERVICE_VERSION = "index-service-v1"
+
+INDEX_PROFILE_FEATURES: dict[AnalysisProfile, tuple[tuple[OwnerType, FeatureType], ...]] = {
+    AnalysisProfile.MINIMAL: (
+        (OwnerType.TRACK, FeatureType.RHYTHM_GLOBAL),
+        (OwnerType.TRACK, FeatureType.HARMONY_CHROMA),
+        (OwnerType.TRACK, FeatureType.TIMBRE_MFCC_STATS),
+    ),
+    AnalysisProfile.SEARCHABLE: (
+        (OwnerType.TRACK, FeatureType.RHYTHM_GLOBAL),
+        (OwnerType.TRACK, FeatureType.HARMONY_CHROMA),
+        (OwnerType.TRACK, FeatureType.TIMBRE_MFCC_STATS),
+        (OwnerType.TRACK, FeatureType.PRODUCTION_TEXTURE),
+        (OwnerType.TRACK, FeatureType.STRUCTURE_SECTION_SEQUENCE),
+    ),
+    AnalysisProfile.SOURCE_AWARE: (
+        (OwnerType.TRACK, FeatureType.RHYTHM_GLOBAL),
+        (OwnerType.TRACK, FeatureType.HARMONY_CHROMA),
+        (OwnerType.TRACK, FeatureType.TIMBRE_MFCC_STATS),
+        (OwnerType.TRACK, FeatureType.PRODUCTION_TEXTURE),
+        (OwnerType.TRACK, FeatureType.STRUCTURE_SECTION_SEQUENCE),
+        (OwnerType.STEM, FeatureType.RHYTHM_DRUM),
+        (OwnerType.STEM, FeatureType.BASS_ROOT_MOTION),
+        (OwnerType.STEM, FeatureType.HARMONY_CHROMA),
+        (OwnerType.STEM, FeatureType.TIMBRE_MFCC_STATS),
+        (OwnerType.SOURCE, FeatureType.HARMONY_CHORD_SEQUENCE),
+        (OwnerType.SOURCE, FeatureType.HARMONY_CHORD_CHANGE),
+        (OwnerType.SOURCE, FeatureType.MELODY_CONTOUR),
+        (OwnerType.SOURCE, FeatureType.TIMBRE_EMBEDDING),
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +117,13 @@ class IndexService:
             )
         )
         return self.status(feature_type, owner_type=owner_type, record=record)
+
+    def build_profile(self, profile: AnalysisProfile | str) -> tuple[IndexStatus, ...]:
+        selected_profile = normalize_analysis_profile(profile)
+        return tuple(
+            self.build_index(feature_type, owner_type=owner_type)
+            for owner_type, feature_type in INDEX_PROFILE_FEATURES[selected_profile]
+        )
 
     def status(
         self,
