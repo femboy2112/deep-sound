@@ -4,6 +4,26 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 3 source-specific harmonic analysis
+
+- **Agent:** Codex
+- **Scope:** Implement deterministic Phase 3 source-specific harmonic analysis without Phase 4 correction learning.
+- **Rows touched:** P3-003 .. P3-012.
+- **Changes:**
+  - Added probabilistic pitched-harmonic source discovery for compatible broad stems.
+  - Added chord/note event domain records and SQLite round-trip DAOs.
+  - Added AnalysisService source routing guardrails and a conservative chroma-template source chord analyzer.
+  - Added roman/root-motion normalization helpers plus source-owned chord sequence and chord-change feature views.
+  - Added source chord search metadata, caveated explanations, and import-safe UI DTO enablement for compatible source modes.
+- **Verification:**
+  - `uv run pytest tests/test_source_service.py tests/test_source_harmonic_discovery.py tests/test_sqlite_store.py tests/test_harmonic_event_store.py tests/test_analysis_service.py tests/test_source_chord_routing.py tests/test_source_chord_analyzer.py tests/test_harmony_normalization.py tests/test_chord_feature_views.py tests/test_chord_similarity.py tests/test_stem_search.py tests/test_explanation_service.py tests/test_chord_explanations.py tests/test_ui_models.py tests/test_source_graph_ui.py tests/test_phase3_ui_models.py`
+  - `uv run ruff format --check .`
+  - `uv run ruff check .`
+  - `uv run mypy src/deep_sound`
+- **Notes:**
+  - Chord labels are deterministic chroma-template estimates, not transcription truth.
+  - Correction learning and user-edit workflows remain Phase 4.
+
 ## 2026-05-20 — Phase 3 control-plane opening
 
 - **Agent:** Codex

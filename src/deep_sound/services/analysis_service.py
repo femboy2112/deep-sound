@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 
+from deep_sound.domain.confidence import Confidence
 from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
+from deep_sound.domain.harmony import ChordEvent, normalize_chord_sequence, root_motion_tokens
+from deep_sound.domain.source import Source, SourceType
 from deep_sound.domain.stem import Stem, StemType
 from deep_sound.domain.track import Track
 from deep_sound.infra.analyzers.bass_stem import summarize_bass_stem
@@ -12,6 +16,7 @@ from deep_sound.infra.analyzers.chroma_librosa import summarize_chroma
 from deep_sound.infra.analyzers.drum_stem import summarize_drum_stem
 from deep_sound.infra.analyzers.mfcc_librosa import summarize_mfcc
 from deep_sound.infra.analyzers.other_stem import summarize_other_stem
+from deep_sound.infra.analyzers.source_chords import infer_source_chord_events
 from deep_sound.infra.analyzers.tempo_librosa import DEFAULT_SAMPLE_RATE, estimate_tempo
 from deep_sound.infra.storage.sqlite_store import SqliteStore
 from deep_sound.services.source_service import SourceService
@@ -176,6 +181,71 @@ class AnalysisService:
             self._store.add_feature_view(view)
         return views
 
+    def analyze_source(self, source: Source) -> list[FeatureView]:
+        """Extract routed Phase 3 feature views for a compatible source."""
+        events = self.infer_source_chords(source)
+        return self.chord_feature_views(source, events)
+
+    def infer_source_chords(self, source: Source) -> list[ChordEvent]:
+        """Infer and persist source chord events for pitched-harmonic sources only."""
+        if source.source_type is not SourceType.PITCHED_HARMONIC:
+            raise ValueError(
+                f"Chord analysis is not enabled for source type {source.source_type.value}"
+            )
+        stem = self._stem_for_source(source)
+        if stem.artifact_path is None:
+            raise ValueError(f"Source {source.id} parent stem has no artifact_path")
+        analysis = infer_source_chord_events(
+            stem.artifact_path,
+            owner_id=source.id,
+            sample_rate=self._sample_rate,
+        )
+        for event in analysis.events:
+            self._store.add_chord_event(event)
+        return analysis.events
+
+    def chord_feature_views(self, source: Source, events: list[ChordEvent]) -> list[FeatureView]:
+        """Persist source-owned chord sequence and chord-change feature views."""
+        if not events:
+            return []
+        sequence_tokens = normalize_chord_sequence(events)
+        root_motion = root_motion_tokens(events)
+        confidence = min(event.confidence.value for event in events)
+        sequence = FeatureView(
+            id=f"{source.id}:harmony.chord_sequence",
+            owner_type=OwnerType.SOURCE,
+            owner_id=source.id,
+            feature_type=FeatureType.HARMONY_CHORD_SEQUENCE,
+            algorithm="source_chords_chroma_template",
+            algorithm_version="0.1.0",
+            params_hash=f"sample_rate={self._sample_rate}",
+            symbolic_json=json.dumps({"tokens": sequence_tokens}, sort_keys=True),
+            stats=_token_histogram(sequence_tokens),
+            confidence=Confidence(confidence),
+        )
+        change = FeatureView(
+            id=f"{source.id}:harmony.chord_change",
+            owner_type=OwnerType.SOURCE,
+            owner_id=source.id,
+            feature_type=FeatureType.HARMONY_CHORD_CHANGE,
+            algorithm="source_chords_chroma_template",
+            algorithm_version="0.1.0",
+            params_hash=f"sample_rate={self._sample_rate}",
+            symbolic_json=json.dumps({"root_motion": root_motion}, sort_keys=True),
+            stats={f"interval_{index:02d}": float(root_motion.count(index)) for index in range(12)},
+            confidence=Confidence(confidence),
+        )
+        views = [sequence, change]
+        for view in views:
+            self._store.add_feature_view(view)
+        return views
+
+    def _stem_for_source(self, source: Source) -> Stem:
+        for stem in self._store.list_stems_for_track(source.track_id):
+            if stem.id == source.parent_stem_id:
+                return stem
+        raise KeyError(f"Parent stem not found for source: {source.id}")
+
     def _emit_progress(self, stage: str, progress: float) -> None:
         if self._progress_callback is not None:
             self._progress_callback(stage, progress)
@@ -183,3 +253,33 @@ class AnalysisService:
 
 def _vector_stats(prefix: str, values: list[float]) -> dict[str, float]:
     return {f"{prefix}_{index:02d}": value for index, value in enumerate(values)}
+
+
+def _token_histogram(tokens: list[str]) -> dict[str, float]:
+    vocabulary = (
+        "I",
+        "bII",
+        "II",
+        "bIII",
+        "III",
+        "IV",
+        "#IV",
+        "V",
+        "bVI",
+        "VI",
+        "bVII",
+        "VII",
+        "i",
+        "bii",
+        "ii",
+        "iv",
+        "#iv",
+        "v",
+    )
+    counts: dict[str, float] = {f"token_{token}": 0.0 for token in vocabulary}
+    for token in tokens:
+        key = f"token_{token}"
+        if key in counts:
+            counts[key] += 1.0
+    counts["token_count"] = float(len(tokens))
+    return counts

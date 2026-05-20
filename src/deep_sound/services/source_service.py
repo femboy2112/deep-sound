@@ -75,6 +75,35 @@ class SourceService:
     def list_sources(self, track_id: str) -> list[Source]:
         return self._store.list_sources_for_track(track_id)
 
+    def discover_pitched_harmonic_sources(self, stem: Stem) -> list[Source]:
+        """Create probabilistic pitched-harmonic candidates from compatible stems."""
+        if stem.stem_type not in {StemType.OTHER, StemType.VOCALS}:
+            return []
+        existing_ids = {source.id for source in self._store.list_sources_for_track(stem.track_id)}
+        candidate_id = f"{stem.id}:pitched-harmonic"
+        if candidate_id in existing_ids:
+            return [
+                source
+                for source in self._store.list_sources_for_track(stem.track_id)
+                if source.id == candidate_id
+            ]
+        confidence = Confidence(min(0.85, max(0.35, stem.confidence.value * 0.8)))
+        label = (
+            "possible pitched harmonic accompaniment"
+            if stem.stem_type is StemType.OTHER
+            else "possible pitched vocal harmony"
+        )
+        source = Source(
+            id=candidate_id,
+            track_id=stem.track_id,
+            parent_stem_id=stem.id,
+            source_type=SourceType.PITCHED_HARMONIC,
+            source_label=label,
+            confidence=confidence,
+        )
+        self._store.add_source(source)
+        return [source]
+
     def source_graph(self, track_id: str) -> SourceGraph:
         sources_by_stem: dict[str, list[Source]] = {}
         for source in self._store.list_sources_for_track(track_id):

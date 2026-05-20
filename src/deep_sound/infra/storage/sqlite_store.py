@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from deep_sound.domain.confidence import Confidence
 from deep_sound.domain.feature_view import FeatureType, FeatureView, OwnerType
+from deep_sound.domain.harmony import ChordEvent, HarmonicOwnerType, NoteEvent
 from deep_sound.domain.source import Source, SourceType
 from deep_sound.domain.stem import Stem, StemType
 from deep_sound.domain.track import Track
@@ -255,6 +256,73 @@ class SqliteStore:
                 (source_id,),
             ).fetchall()
         return [_source_activity_from_row(row) for row in rows]
+
+    def add_chord_event(self, event: ChordEvent) -> ChordEvent:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO chord_events (
+                    id, owner_type, owner_id, start_sec, end_sec, chord_label,
+                    roman_numeral, root, quality, bass_note, confidence, source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event.id,
+                    event.owner_type.value,
+                    event.owner_id,
+                    event.start_sec,
+                    event.end_sec,
+                    event.chord_label,
+                    event.roman_numeral,
+                    event.root,
+                    event.quality,
+                    event.bass_note,
+                    event.confidence.value,
+                    event.source,
+                ),
+            )
+        return event
+
+    def list_chord_events_for_owner(self, owner_id: str) -> list[ChordEvent]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM chord_events WHERE owner_id = ? ORDER BY start_sec ASC, id ASC",
+                (owner_id,),
+            ).fetchall()
+        return [_chord_event_from_row(row) for row in rows]
+
+    def add_note_event(self, event: NoteEvent) -> NoteEvent:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO note_events (
+                    id, owner_type, owner_id, start_sec, end_sec, pitch_midi,
+                    pitch_name, velocity, confidence
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event.id,
+                    event.owner_type.value,
+                    event.owner_id,
+                    event.start_sec,
+                    event.end_sec,
+                    event.pitch_midi,
+                    event.pitch_name,
+                    event.velocity,
+                    event.confidence.value,
+                ),
+            )
+        return event
+
+    def list_note_events_for_owner(self, owner_id: str) -> list[NoteEvent]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM note_events WHERE owner_id = ? ORDER BY start_sec ASC, id ASC",
+                (owner_id,),
+            ).fetchall()
+        return [_note_event_from_row(row) for row in rows]
 
     def add_feature_view(self, view: FeatureView) -> FeatureView:
         with self._connect() as conn:
@@ -529,6 +597,37 @@ def _source_activity_from_row(row: sqlite3.Row) -> SourceActivityRecord:
         section_id=_optional_str(row["section_id"]),
         start_sec=float(row["start_sec"]),
         end_sec=float(row["end_sec"]),
+        confidence=Confidence(float(row["confidence"])),
+    )
+
+
+def _chord_event_from_row(row: sqlite3.Row) -> ChordEvent:
+    return ChordEvent(
+        id=str(row["id"]),
+        owner_type=HarmonicOwnerType(str(row["owner_type"])),
+        owner_id=str(row["owner_id"]),
+        start_sec=float(row["start_sec"]),
+        end_sec=float(row["end_sec"]),
+        chord_label=str(row["chord_label"]),
+        roman_numeral=_optional_str(row["roman_numeral"]),
+        root=_optional_str(row["root"]),
+        quality=_optional_str(row["quality"]),
+        bass_note=_optional_str(row["bass_note"]),
+        confidence=Confidence(float(row["confidence"])),
+        source=str(row["source"]),
+    )
+
+
+def _note_event_from_row(row: sqlite3.Row) -> NoteEvent:
+    return NoteEvent(
+        id=str(row["id"]),
+        owner_type=HarmonicOwnerType(str(row["owner_type"])),
+        owner_id=str(row["owner_id"]),
+        start_sec=float(row["start_sec"]),
+        end_sec=float(row["end_sec"]),
+        pitch_midi=float(row["pitch_midi"]),
+        pitch_name=str(row["pitch_name"]),
+        velocity=_optional_float(row["velocity"]),
         confidence=Confidence(float(row["confidence"])),
     )
 

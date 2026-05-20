@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from deep_sound.domain.source import SourceType
 from deep_sound.services.source_service import SourceGraph
 
 
@@ -14,6 +15,7 @@ class SourceGraphNodeData:
     confidence: float
     feature_count: int
     disabled_phase3_controls: bool = True
+    source_type: str | None = None
 
 
 def source_graph_nodes(graph: SourceGraph) -> list[SourceGraphNodeData]:
@@ -26,6 +28,7 @@ def source_graph_nodes(graph: SourceGraph) -> list[SourceGraphNodeData]:
                 label=stem.stem_type.value,
                 confidence=stem.confidence.value,
                 feature_count=len(graph_stem.feature_views),
+                source_type=None,
             )
         )
         for source in graph_stem.sources:
@@ -35,6 +38,8 @@ def source_graph_nodes(graph: SourceGraph) -> list[SourceGraphNodeData]:
                     label=source.source_label,
                     confidence=source.confidence.value,
                     feature_count=0,
+                    disabled_phase3_controls=source.source_type is not SourceType.PITCHED_HARMONIC,
+                    source_type=source.source_type.value,
                 )
             )
     return nodes

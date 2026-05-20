@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from deep_sound.domain.source import SourceType
+
 
 @dataclass(frozen=True, slots=True)
 class QueryWeights:
@@ -23,6 +25,35 @@ class QueryWeights:
         if total <= 0.0:
             return {"rhythm": 1.0, "harmony": 1.0, "timbre": 1.0}
         return {key: value / total for key, value in weights.items()}
+
+    def normalized_phase3_weights(self) -> dict[str, float]:
+        weights = self.normalized_phase1_weights()
+        chord_change = max(0.0, self.chord_change)
+        source_behavior = max(0.0, self.source_behavior)
+        if chord_change > 0.0:
+            weights["harmony.chord_change"] = chord_change
+        if source_behavior > 0.0:
+            weights["harmony.chord_sequence"] = source_behavior
+        total = sum(weights.values())
+        return {key: value / total for key, value in weights.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class Phase3QueryControlState:
+    selected_source_enabled: bool
+    chord_change_enabled: bool
+    source_chord_enabled: bool
+    compatible_source_filter_enabled: bool
+
+
+def phase3_query_control_state(source_type: SourceType | None) -> Phase3QueryControlState:
+    enabled = source_type is SourceType.PITCHED_HARMONIC
+    return Phase3QueryControlState(
+        selected_source_enabled=enabled,
+        chord_change_enabled=enabled,
+        source_chord_enabled=enabled,
+        compatible_source_filter_enabled=enabled,
+    )
 
 
 def create_query_builder_widget(weights: QueryWeights | None = None) -> object:

@@ -47,6 +47,10 @@ class ExplanationService:
             parts.append(
                 f"The matched stem is {result.matched_stem}; treat stem identity as probabilistic."
             )
+        if isinstance(result, SimilarityResult) and result.matched_source is not None:
+            parts.append(
+                f"The matched source is {result.matched_source}; source and chord labels are probabilistic."
+            )
         if isinstance(result, SimilarityResult) and result.matched_range is not None:
             parts.append(f"The matched range is {result.matched_range}.")
         if len(ranked_scores) > 1:

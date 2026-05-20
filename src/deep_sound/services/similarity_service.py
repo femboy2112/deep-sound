@@ -15,6 +15,8 @@ class SearchMode(StrEnum):
     HARMONY = "harmony"
     TIMBRE = "timbre"
     WEIGHTED = "weighted"
+    SOURCE_CHORDS = "source_chords"
+    CHORD_CHANGE = "chord_change"
 
 
 MODE_FEATURE_TYPES: dict[SearchMode, tuple[FeatureType, ...]] = {
@@ -26,6 +28,8 @@ MODE_FEATURE_TYPES: dict[SearchMode, tuple[FeatureType, ...]] = {
         FeatureType.HARMONY_CHROMA,
         FeatureType.TIMBRE_MFCC_STATS,
     ),
+    SearchMode.SOURCE_CHORDS: (FeatureType.HARMONY_CHORD_SEQUENCE,),
+    SearchMode.CHORD_CHANGE: (FeatureType.HARMONY_CHORD_CHANGE,),
 }
 
 
@@ -36,6 +40,7 @@ class SimilarityResult:
     dimension_scores: dict[str, float]
     owner_type: OwnerType = OwnerType.TRACK
     matched_stem: str | None = None
+    matched_source: str | None = None
     matched_range: str | None = None
     caveats: tuple[str, ...] = ()
 
@@ -89,24 +94,53 @@ class SimilarityService:
             if weight_total <= 0.0:
                 continue
             results.append(
-                SimilarityResult(
-                    owner_id=candidate_id,
+                self._result_for_candidate(
+                    candidate_id=candidate_id,
+                    owner_type=candidate_owner_types.get(candidate_id, OwnerType.TRACK),
                     score=weighted_total / weight_total,
                     dimension_scores=dimension_scores,
-                    owner_type=candidate_owner_types.get(candidate_id, OwnerType.TRACK),
-                    matched_stem=candidate_id
-                    if candidate_owner_types.get(candidate_id) is OwnerType.STEM
-                    else None,
-                    matched_range="full stem"
-                    if candidate_owner_types.get(candidate_id) is OwnerType.STEM
-                    else None,
-                    caveats=("Stem-level match is probabilistic.",)
-                    if candidate_owner_types.get(candidate_id) is OwnerType.STEM
-                    else (),
                 )
             )
 
         return sorted(results, key=lambda result: (-result.score, result.owner_id))[:top_k]
+
+    def _result_for_candidate(
+        self,
+        *,
+        candidate_id: str,
+        owner_type: OwnerType,
+        score: float,
+        dimension_scores: dict[str, float],
+    ) -> SimilarityResult:
+        if owner_type is OwnerType.STEM:
+            return SimilarityResult(
+                owner_id=candidate_id,
+                score=score,
+                dimension_scores=dimension_scores,
+                owner_type=owner_type,
+                matched_stem=candidate_id,
+                matched_range="full stem",
+                caveats=("Stem-level match is probabilistic.",),
+            )
+        if owner_type is OwnerType.SOURCE:
+            return SimilarityResult(
+                owner_id=candidate_id,
+                score=score,
+                dimension_scores=dimension_scores,
+                owner_type=owner_type,
+                matched_source=candidate_id,
+                matched_range="source chord events",
+                caveats=(
+                    "Source-specific chord match is probabilistic.",
+                    "Low-confidence chord labels should be checked before use.",
+                ),
+            )
+        return SimilarityResult(
+            owner_id=candidate_id,
+            score=score,
+            dimension_scores=dimension_scores,
+            owner_type=owner_type,
+        )
 
     def search_mode(
         self,
@@ -131,6 +165,23 @@ class SimilarityService:
             weights=weights,
             top_k=top_k,
             owner_type=OwnerType.STEM,
+        )
+
+    def search_source_chords(
+        self,
+        query_id: str,
+        *,
+        include_chord_change: bool = True,
+        top_k: int = 10,
+    ) -> list[SimilarityResult]:
+        weights = {FeatureType.HARMONY_CHORD_SEQUENCE.value: 1.0}
+        if include_chord_change:
+            weights[FeatureType.HARMONY_CHORD_CHANGE.value] = 1.0
+        return self.search(
+            query_id=query_id,
+            weights=weights,
+            top_k=top_k,
+            owner_type=OwnerType.SOURCE,
         )
 
     def _score_dimension(
