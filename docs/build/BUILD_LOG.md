@@ -4,6 +4,19 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 3 control-plane opening
+
+- **Agent:** Codex
+- **Scope:** Open Phase 3 for source-specific harmonic analysis.
+- **Rows touched:** P3-001, P3-002.
+- **Changes:**
+  - Added Phase 3 FILE_PLAN rows P3-001 through P3-012 through `scripts/update_plan.py`.
+  - Promoted `ACTIVE_PHASE` from 2 to 3.
+  - Documented the Phase 3 boundary: probabilistic source/chord output only, routed chord analysis only for compatible sources, and no Phase 4 correction learning.
+- **Verification:**
+  - `uv run pytest tests/test_update_plan.py`
+  - `python3 scripts/status.py`
+
 ## 2026-05-20 — Phase 2 broad stem analysis
 
 - **Agent:** Codex

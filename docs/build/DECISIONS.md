@@ -56,3 +56,9 @@ It must not auto-edit `.codex/`, `.claude/`, `docs/`, or source files. A human o
 Phase 2 keeps Demucs optional behind the `[demucs]` extra. Core verification uses a deterministic fake broad-stem provider that writes vocals, drums, bass, and other artifacts under app data while preserving original audio bytes.
 
 The Phase 2 analyzers intentionally emit broad-stem proxy features only. Drum output is rhythm/timbre evidence, bass output is root-motion evidence, and other/accompaniment output is chroma/timbre evidence. Source-specific chord claims, instrument-specific harmony, and correction learning remain Phase 3+ work.
+
+## 2026-05-20 — Phase 3 harmonic source boundary
+
+Phase 3 promotes source-specific harmonic analysis, but every source label, chord label, roman numeral, and note event remains probabilistic and confidence-bounded. Chord analyzers are routed only to compatible pitched-harmonic sources; drums, effects, texture, and unknown sources are rejected by default.
+
+Correction learning, user-edited chord truth, and ranking updates from feedback remain Phase 4. Phase 3 may preserve compatibility with existing correction storage, but it must not train from or reinterpret corrections.
