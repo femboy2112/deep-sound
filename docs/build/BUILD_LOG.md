@@ -25,6 +25,20 @@ Append-only journal of build sessions. Newest entries at the top.
   - Optional real Demucs smoke skipped by default unless `DEEP_SOUND_RUN_DEMUCS_SMOKE=1`, a Demucs executable, and `DEEP_SOUND_DEMUCS_SMOKE_AUDIO` are supplied.
   - Default verification still does not require Demucs, PySide, FAISS, learned embeddings, cloud services, installers, or heavy MIR extras.
 
+### Live-smoke follow-up
+
+- **Trigger:** User requested live testing instead of accepting skipped optional smoke.
+- **Findings:**
+  - Real Demucs rejected the adapter command because `--two-stems none` is invalid for the selected model.
+  - The current CPU Torch/Torchaudio stack also requires `torchcodec` for `torchaudio.load`.
+- **Fixes:**
+  - Removed `--two-stems none` so Demucs runs normal four-stem separation.
+  - Added `torchcodec>=0.12` to the `[demucs]` extra and lockfile.
+- **Verification:**
+  - `DEEP_SOUND_RUN_DEMUCS_SMOKE=1 DEEP_SOUND_DEMUCS_EXECUTABLE=/home/leah/ds/deep-sound/.venv/bin/demucs DEEP_SOUND_DEMUCS_SMOKE_AUDIO=/tmp/deep_sound_live_smoke.wav uv run pytest tests/test_phase10_optional_demucs_smoke.py -vv`
+  - `uv run pytest tests/test_phase10_demucs_provider_contract.py tests/test_phase10_optional_demucs_smoke.py`
+  - `python3 scripts/verify.py`
+
 ---
 
 ## 2026-05-20 — Phase 9 interactive desktop beta hardening

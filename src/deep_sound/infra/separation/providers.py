@@ -106,8 +106,6 @@ class DemucsProvider(SeparationProvider):
         demucs_root = output_dir / "_demucs"
         command = [
             self._executable,
-            "--two-stems",
-            "none",
             "-n",
             self.model_version,
             "-o",

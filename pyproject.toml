@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-demucs = ["demucs>=4.0", "torch>=2.0"]
+demucs = ["demucs>=4.0", "torch>=2.0", "torchcodec>=0.12"]
 ui = ["PySide6>=6.6"]
 index = ["faiss-cpu>=1.7"]
 mir = ["essentia>=2.1b6.dev1110; platform_system != 'Windows'"]
