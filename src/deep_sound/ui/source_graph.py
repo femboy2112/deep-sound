@@ -16,6 +16,10 @@ class SourceGraphNodeData:
     feature_count: int
     disabled_phase3_controls: bool = True
     source_type: str | None = None
+    is_user_corrected: bool = False
+    raw_label: str | None = None
+    raw_source_type: str | None = None
+    correction_id: str | None = None
 
 
 def source_graph_nodes(graph: SourceGraph) -> list[SourceGraphNodeData]:
@@ -40,6 +44,7 @@ def source_graph_nodes(graph: SourceGraph) -> list[SourceGraphNodeData]:
                     feature_count=0,
                     disabled_phase3_controls=source.source_type is not SourceType.PITCHED_HARMONIC,
                     source_type=source.source_type.value,
+                    is_user_corrected=source.is_user_corrected,
                 )
             )
     return nodes

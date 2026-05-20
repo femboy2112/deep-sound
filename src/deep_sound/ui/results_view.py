@@ -15,6 +15,8 @@ class ResultCardData:
     explanation: str
     matched_range: str | None = None
     matched_source: str | None = None
+    baseline_score: float | None = None
+    feedback_adjustment: float = 0.0
     warnings: tuple[str, ...] = field(default_factory=tuple)
 
 

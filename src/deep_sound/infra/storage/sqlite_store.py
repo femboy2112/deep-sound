@@ -229,6 +229,13 @@ class SqliteStore:
             ).fetchall()
         return [_source_from_row(row) for row in rows]
 
+    def get_source(self, source_id: str) -> Source:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM sources WHERE id = ?", (source_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"Source not found: {source_id}")
+        return _source_from_row(row)
+
     def add_source_activity(self, activity: SourceActivityRecord) -> SourceActivityRecord:
         with self._connect() as conn:
             conn.execute(
@@ -291,6 +298,13 @@ class SqliteStore:
                 (owner_id,),
             ).fetchall()
         return [_chord_event_from_row(row) for row in rows]
+
+    def get_chord_event(self, event_id: str) -> ChordEvent:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM chord_events WHERE id = ?", (event_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"ChordEvent not found: {event_id}")
+        return _chord_event_from_row(row)
 
     def add_note_event(self, event: NoteEvent) -> NoteEvent:
         with self._connect() as conn:
@@ -435,15 +449,25 @@ class SqliteStore:
             raise KeyError(f"Correction not found: {correction_id}")
         return _correction_from_row(row)
 
-    def list_corrections(self, entity_id: str | None = None) -> list[CorrectionRecord]:
+    def list_corrections(
+        self,
+        entity_id: str | None = None,
+        entity_type: str | None = None,
+    ) -> list[CorrectionRecord]:
         sql = "SELECT * FROM corrections"
-        params: tuple[str, ...] = ()
+        clauses: list[str] = []
+        params: list[str] = []
         if entity_id is not None:
-            sql += " WHERE entity_id = ?"
-            params = (entity_id,)
+            clauses.append("entity_id = ?")
+            params.append(entity_id)
+        if entity_type is not None:
+            clauses.append("entity_type = ?")
+            params.append(entity_type)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY created_at ASC, id ASC"
         with self._connect() as conn:
-            rows = conn.execute(sql, params).fetchall()
+            rows = conn.execute(sql, tuple(params)).fetchall()
         return [_correction_from_row(row) for row in rows]
 
     def create_job(

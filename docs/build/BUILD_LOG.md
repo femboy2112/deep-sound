@@ -4,6 +4,26 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 4 correction loop and feedback-aware ranking
+
+- **Agent:** Codex
+- **Scope:** Implement bounded user correction overlays and deterministic feedback-aware reranking.
+- **Rows touched:** P4-003 .. P4-012.
+- **Changes:**
+  - Added typed correction payloads for source labels/types, chord labels, and result feedback.
+  - Added `CorrectionService` over the existing SQLite `corrections` table with effective source/chord reads.
+  - Added source label/type overlays in `SourceService` without mutating raw source rows.
+  - Added relevant/irrelevant result feedback and bounded optional reranking in `SimilarityService`.
+  - Added explanation metadata and import-safe UI DTOs for correction controls and feedback-adjusted result cards.
+- **Verification:**
+  - `uv run pytest tests/test_corrections_domain.py tests/test_correction_service.py tests/test_source_corrections.py tests/test_chord_corrections.py tests/test_result_feedback.py tests/test_feedback_reranking.py tests/test_correction_explanations.py tests/test_correction_ui_models.py tests/test_sqlite_store.py tests/test_source_service.py tests/test_chord_similarity.py tests/test_explanation_service.py tests/test_source_graph_ui.py tests/test_ui_models.py`
+  - `uv run ruff format --check src/deep_sound tests`
+  - `uv run ruff check src/deep_sound tests`
+  - `uv run mypy src/deep_sound`
+- **Notes:**
+  - Raw analyzer outputs and baseline records remain inspectable separately from user overrides.
+  - Feedback adjustments are deterministic, capped at +/-0.10, and exposed separately from dimension scores.
+
 ## 2026-05-20 — Phase 4 control-plane opening
 
 - **Agent:** Codex

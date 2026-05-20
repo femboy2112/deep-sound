@@ -30,7 +30,12 @@ class ExplanationService:
             target = f"{owner_id} " if owner_id is not None else ""
             return f"{target}has no comparable score details yet; treat the match as uncertain."
 
-        ranked_scores = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+        comparable_scores: Mapping[str, float] = {
+            name: score for name, score in scores.items() if name != "feedback_adjustment"
+        }
+        if not comparable_scores:
+            comparable_scores = scores
+        ranked_scores = sorted(comparable_scores.items(), key=lambda item: (-item[1], item[0]))
         strongest_name, strongest_score = ranked_scores[0]
         parts: list[str] = []
         if owner_id is not None and overall is not None:
@@ -53,6 +58,13 @@ class ExplanationService:
             )
         if isinstance(result, SimilarityResult) and result.matched_range is not None:
             parts.append(f"The matched range is {result.matched_range}.")
+        if isinstance(result, SimilarityResult) and result.feedback_adjustment:
+            baseline = result.baseline_score if result.baseline_score is not None else result.score
+            parts.append(
+                "User feedback adjusted the ranking from "
+                f"{baseline:.2f} to {result.score:.2f} "
+                f"({result.feedback_adjustment:+.2f})."
+            )
         if len(ranked_scores) > 1:
             supporting = ", ".join(f"{name} {score:.2f}" for name, score in ranked_scores[1:3])
             parts.append(f"Other observed dimensions are {supporting}.")

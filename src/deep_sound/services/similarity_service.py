@@ -6,7 +6,9 @@ import math
 from dataclasses import dataclass
 from enum import StrEnum
 
+from deep_sound.domain.corrections import clamp_score
 from deep_sound.domain.feature_view import FeatureType, OwnerType
+from deep_sound.services.correction_service import CorrectionService
 from deep_sound.services.feature_service import FeatureService
 
 
@@ -43,13 +45,21 @@ class SimilarityResult:
     matched_source: str | None = None
     matched_range: str | None = None
     caveats: tuple[str, ...] = ()
+    baseline_score: float | None = None
+    feedback_adjustment: float = 0.0
 
 
 class SimilarityService:
     """Candidate retrieval + weighted combined scoring over in-memory vectors."""
 
-    def __init__(self, features: FeatureService) -> None:
+    def __init__(
+        self,
+        features: FeatureService,
+        *,
+        correction_service: CorrectionService | None = None,
+    ) -> None:
         self._features = features
+        self._correction_service = correction_service
 
     def search(
         self,
@@ -95,6 +105,7 @@ class SimilarityService:
                 continue
             results.append(
                 self._result_for_candidate(
+                    query_id=query_id,
                     candidate_id=candidate_id,
                     owner_type=candidate_owner_types.get(candidate_id, OwnerType.TRACK),
                     score=weighted_total / weight_total,
@@ -107,25 +118,34 @@ class SimilarityService:
     def _result_for_candidate(
         self,
         *,
+        query_id: str,
         candidate_id: str,
         owner_type: OwnerType,
         score: float,
         dimension_scores: dict[str, float],
     ) -> SimilarityResult:
+        baseline_score = clamp_score(score)
+        feedback_adjustment = self._feedback_adjustment(query_id, candidate_id)
+        adjusted_score = clamp_score(baseline_score + feedback_adjustment)
+        caveats: tuple[str, ...] = ()
+        if feedback_adjustment:
+            caveats = (f"User result feedback adjusted this score by {feedback_adjustment:+.2f}.",)
         if owner_type is OwnerType.STEM:
             return SimilarityResult(
                 owner_id=candidate_id,
-                score=score,
+                score=adjusted_score,
                 dimension_scores=dimension_scores,
                 owner_type=owner_type,
                 matched_stem=candidate_id,
                 matched_range="full stem",
-                caveats=("Stem-level match is probabilistic.",),
+                caveats=("Stem-level match is probabilistic.", *caveats),
+                baseline_score=baseline_score,
+                feedback_adjustment=feedback_adjustment,
             )
         if owner_type is OwnerType.SOURCE:
             return SimilarityResult(
                 owner_id=candidate_id,
-                score=score,
+                score=adjusted_score,
                 dimension_scores=dimension_scores,
                 owner_type=owner_type,
                 matched_source=candidate_id,
@@ -133,14 +153,25 @@ class SimilarityService:
                 caveats=(
                     "Source-specific chord match is probabilistic.",
                     "Low-confidence chord labels should be checked before use.",
+                    *caveats,
                 ),
+                baseline_score=baseline_score,
+                feedback_adjustment=feedback_adjustment,
             )
         return SimilarityResult(
             owner_id=candidate_id,
-            score=score,
+            score=adjusted_score,
             dimension_scores=dimension_scores,
             owner_type=owner_type,
+            caveats=caveats,
+            baseline_score=baseline_score,
+            feedback_adjustment=feedback_adjustment,
         )
+
+    def _feedback_adjustment(self, query_id: str, candidate_id: str) -> float:
+        if self._correction_service is None:
+            return 0.0
+        return self._correction_service.feedback_adjustment(query_id, candidate_id)
 
     def search_mode(
         self,

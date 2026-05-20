@@ -12,6 +12,7 @@ from deep_sound.domain.stem import Stem, StemType
 from deep_sound.domain.track import Track
 from deep_sound.infra.separation import BROAD_STEM_TYPES, SeparationProvider
 from deep_sound.infra.storage.sqlite_store import SqliteStore
+from deep_sound.services.correction_service import CorrectionService
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,10 +45,12 @@ class SourceService:
         *,
         app_data_dir: Path,
         separation_provider: SeparationProvider | None = None,
+        correction_service: CorrectionService | None = None,
     ) -> None:
         self._store = store
         self._app_data_dir = app_data_dir
         self._separation_provider = separation_provider
+        self._correction_service = correction_service
 
     def separate_broad_stems(self, track: Track) -> list[Stem]:
         if self._separation_provider is None:
@@ -74,6 +77,12 @@ class SourceService:
 
     def list_sources(self, track_id: str) -> list[Source]:
         return self._store.list_sources_for_track(track_id)
+
+    def list_effective_sources(self, track_id: str) -> list[Source]:
+        sources = self._store.list_sources_for_track(track_id)
+        if self._correction_service is None:
+            return sources
+        return [self._apply_source_correction(source) for source in sources]
 
     def discover_pitched_harmonic_sources(self, stem: Stem) -> list[Source]:
         """Create probabilistic pitched-harmonic candidates from compatible stems."""
@@ -106,7 +115,7 @@ class SourceService:
 
     def source_graph(self, track_id: str) -> SourceGraph:
         sources_by_stem: dict[str, list[Source]] = {}
-        for source in self._store.list_sources_for_track(track_id):
+        for source in self.list_effective_sources(track_id):
             sources_by_stem.setdefault(source.parent_stem_id, []).append(source)
 
         graph_stems: list[SourceGraphStem] = []
@@ -120,6 +129,23 @@ class SourceService:
                 )
             )
         return SourceGraph(track_id=track_id, stems=tuple(graph_stems))
+
+    def _apply_source_correction(self, source: Source) -> Source:
+        if self._correction_service is None:
+            return source
+        effective = self._correction_service.effective_source(source)
+        if not effective.is_user_corrected:
+            return source
+        return Source(
+            id=source.id,
+            track_id=source.track_id,
+            parent_stem_id=source.parent_stem_id,
+            source_type=effective.source_type,
+            source_label=effective.label,
+            confidence=source.confidence,
+            user_label=effective.label,
+            is_user_corrected=True,
+        )
 
 
 def source_from_stem(stem: Stem) -> Source:
