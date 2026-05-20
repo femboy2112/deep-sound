@@ -4,6 +4,19 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 4 control-plane opening
+
+- **Agent:** Codex
+- **Scope:** Open Phase 4 for bounded correction overrides and feedback-aware ranking.
+- **Rows touched:** P4-001, P4-002.
+- **Changes:**
+  - Added Phase 4 FILE_PLAN rows P4-001 through P4-012 through `scripts/update_plan.py`.
+  - Promoted `ACTIVE_PHASE` from 3 to 4.
+  - Documented the Phase 4 boundary: corrections remain separate from raw outputs, ranking adjustments are bounded and explainable, and no model training is introduced.
+- **Verification:**
+  - `uv run pytest tests/test_update_plan.py`
+  - `python3 scripts/status.py`
+
 ## 2026-05-20 — Phase 3 source-specific harmonic analysis
 
 - **Agent:** Codex

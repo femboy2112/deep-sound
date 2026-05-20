@@ -62,3 +62,9 @@ The Phase 2 analyzers intentionally emit broad-stem proxy features only. Drum ou
 Phase 3 promotes source-specific harmonic analysis, but every source label, chord label, roman numeral, and note event remains probabilistic and confidence-bounded. Chord analyzers are routed only to compatible pitched-harmonic sources; drums, effects, texture, and unknown sources are rejected by default.
 
 Correction learning, user-edited chord truth, and ranking updates from feedback remain Phase 4. Phase 3 may preserve compatibility with existing correction storage, but it must not train from or reinterpret corrections.
+
+## 2026-05-20 — Phase 4 correction boundary
+
+Phase 4 stores user corrections as reversible overrides and feedback records. Raw analyzer output, source records, chord events, feature views, and baseline similarity scores remain inspectable without mutation.
+
+Correction-aware ranking is deterministic and bounded: relevant feedback may add a small transparent boost, irrelevant feedback may add a small transparent penalty, and final scores stay normalized to `[0, 1]`. Phase 4 does not train models, rewrite embeddings, or present user-edited labels as analyzer truth.
