@@ -27,9 +27,9 @@ app_data/
 *.m4a
 *.ogg
 
-# Distribution
-dist/
-build/
+# Distribution (anchored to repo root so docs/build/ stays tracked)
+/dist/
+/build/
 
 # Editor
 .vscode/
