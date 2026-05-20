@@ -13,10 +13,13 @@ class ResultCardData:
     combined_score: float
     dimension_scores: dict[str, float]
     explanation: str
+    matched_entity_type: str | None = None
     matched_range: str | None = None
     matched_source: str | None = None
+    matched_stem: str | None = None
     baseline_score: float | None = None
     feedback_adjustment: float = 0.0
+    caveats: tuple[str, ...] = field(default_factory=tuple)
     warnings: tuple[str, ...] = field(default_factory=tuple)
 
 

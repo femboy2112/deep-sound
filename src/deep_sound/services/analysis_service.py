@@ -14,11 +14,13 @@ from deep_sound.domain.track import Track
 from deep_sound.infra.analyzers.bass_stem import summarize_bass_stem
 from deep_sound.infra.analyzers.chroma_librosa import summarize_chroma
 from deep_sound.infra.analyzers.drum_stem import summarize_drum_stem
+from deep_sound.infra.analyzers.melody_contour import summarize_melody_contour
 from deep_sound.infra.analyzers.mfcc_librosa import summarize_mfcc
 from deep_sound.infra.analyzers.other_stem import summarize_other_stem
+from deep_sound.infra.analyzers.production_texture import summarize_production_texture
 from deep_sound.infra.analyzers.source_chords import infer_source_chord_events
 from deep_sound.infra.analyzers.tempo_librosa import DEFAULT_SAMPLE_RATE, estimate_tempo
-from deep_sound.infra.storage.sqlite_store import SqliteStore
+from deep_sound.infra.storage.sqlite_store import SectionRecord, SqliteStore
 from deep_sound.services.source_service import SourceService
 
 ProgressCallback = Callable[[str, float], None]
@@ -186,6 +188,111 @@ class AnalysisService:
         events = self.infer_source_chords(source)
         return self.chord_feature_views(source, events)
 
+    def analyze_production_texture(self, track: Track) -> FeatureView:
+        """Extract and persist Phase 5 track-level production texture."""
+        summary = summarize_production_texture(track.filepath, sample_rate=self._sample_rate)
+        view = FeatureView(
+            id=f"{track.id}:production.texture",
+            owner_type=OwnerType.TRACK,
+            owner_id=track.id,
+            feature_type=FeatureType.PRODUCTION_TEXTURE,
+            algorithm=summary.analyzer,
+            algorithm_version=summary.analyzer_version,
+            params_hash=f"sample_rate={self._sample_rate}",
+            stats=summary.stats,
+            confidence=summary.confidence,
+        )
+        self._store.add_feature_view(view)
+        return view
+
+    def structure_feature_view(self, track: Track) -> FeatureView:
+        """Create a structure.section_sequence view from existing section rows."""
+        sections = self._store.list_sections_for_track(track.id)
+        stats = _section_sequence_stats(sections, track.duration_sec)
+        confidence_value = min(
+            (section.confidence.value for section in sections),
+            default=0.0,
+        )
+        view = FeatureView(
+            id=f"{track.id}:structure.section_sequence",
+            owner_type=OwnerType.TRACK,
+            owner_id=track.id,
+            feature_type=FeatureType.STRUCTURE_SECTION_SEQUENCE,
+            algorithm="section_sequence_existing_rows",
+            algorithm_version="0.1.0",
+            params_hash="source=sqlite.sections",
+            symbolic_json=json.dumps(
+                {
+                    "sections": [
+                        {
+                            "label": section.label,
+                            "start_sec": section.start_sec,
+                            "end_sec": section.end_sec,
+                            "confidence": section.confidence.value,
+                        }
+                        for section in sections
+                    ]
+                },
+                sort_keys=True,
+            ),
+            stats=stats,
+            confidence=Confidence(confidence_value),
+        )
+        self._store.add_feature_view(view)
+        return view
+
+    def analyze_melody_contour(self, source: Source) -> FeatureView:
+        """Extract melody contour for routed melodic or vocal-like sources."""
+        if source.source_type not in {SourceType.MELODIC, SourceType.PITCHED_HARMONIC}:
+            raise ValueError(
+                f"Melody contour is not enabled for source type {source.source_type.value}"
+            )
+        stem = self._stem_for_source(source)
+        if stem.artifact_path is None:
+            raise ValueError(f"Source {source.id} parent stem has no artifact_path")
+        summary = summarize_melody_contour(stem.artifact_path, sample_rate=self._sample_rate)
+        view = FeatureView(
+            id=f"{source.id}:melody.contour",
+            owner_type=OwnerType.SOURCE,
+            owner_id=source.id,
+            feature_type=FeatureType.MELODY_CONTOUR,
+            algorithm=summary.analyzer,
+            algorithm_version=summary.analyzer_version,
+            params_hash=f"sample_rate={self._sample_rate}",
+            stats=summary.contour,
+            confidence=Confidence(min(summary.confidence.value, source.confidence.value)),
+        )
+        self._store.add_feature_view(view)
+        return view
+
+    def analyze_source_timbre(self, source: Source) -> FeatureView:
+        """Extract a source-owned timbre proxy using existing MFCC summaries."""
+        if source.source_type not in {
+            SourceType.MELODIC,
+            SourceType.PITCHED_HARMONIC,
+            SourceType.TEXTURE,
+        }:
+            raise ValueError(
+                f"Source timbre is not enabled for source type {source.source_type.value}"
+            )
+        stem = self._stem_for_source(source)
+        if stem.artifact_path is None:
+            raise ValueError(f"Source {source.id} parent stem has no artifact_path")
+        summary = summarize_mfcc(stem.artifact_path, sample_rate=self._sample_rate)
+        view = FeatureView(
+            id=f"{source.id}:timbre.embedding",
+            owner_type=OwnerType.SOURCE,
+            owner_id=source.id,
+            feature_type=FeatureType.TIMBRE_EMBEDDING,
+            algorithm=f"{summary.analyzer}_source_proxy",
+            algorithm_version=summary.analyzer_version,
+            params_hash=f"sample_rate={self._sample_rate};n_mfcc={summary.n_mfcc}",
+            stats=_vector_stats("timbre", summary.mfcc),
+            confidence=Confidence(min(summary.confidence.value, source.confidence.value)),
+        )
+        self._store.add_feature_view(view)
+        return view
+
     def infer_source_chords(self, source: Source) -> list[ChordEvent]:
         """Infer and persist source chord events for pitched-harmonic sources only."""
         if source.source_type is not SourceType.PITCHED_HARMONIC:
@@ -283,3 +390,37 @@ def _token_histogram(tokens: list[str]) -> dict[str, float]:
             counts[key] += 1.0
     counts["token_count"] = float(len(tokens))
     return counts
+
+
+def _section_sequence_stats(
+    sections: list[SectionRecord],
+    track_duration_sec: float | None,
+) -> dict[str, float]:
+    duration = max(track_duration_sec or 0.0, 0.0)
+    stats = {
+        "section_count": float(len(sections)),
+        "average_section_fraction": 0.0,
+        "duration_variation": 0.0,
+        "label_variety": 0.0,
+        "coverage": 0.0,
+    }
+    if not sections:
+        return stats
+    lengths = [max(0.0, section.end_sec - section.start_sec) for section in sections]
+    total = sum(lengths)
+    denominator = duration if duration > 0.0 else max(total, 1.0)
+    mean_length = total / len(lengths)
+    stats["average_section_fraction"] = mean_length / denominator
+    stats["duration_variation"] = (
+        0.0 if mean_length <= 0.0 else min(1.0, _std(lengths) / mean_length)
+    )
+    stats["label_variety"] = len({section.label.lower() for section in sections}) / len(sections)
+    stats["coverage"] = min(1.0, total / denominator)
+    return stats
+
+
+def _std(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    mean = sum(values) / len(values)
+    return float((sum((value - mean) ** 2 for value in values) / len(values)) ** 0.5)

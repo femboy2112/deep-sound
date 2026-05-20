@@ -53,9 +53,23 @@ class ExplanationService:
                 f"The matched stem is {result.matched_stem}; treat stem identity as probabilistic."
             )
         if isinstance(result, SimilarityResult) and result.matched_source is not None:
-            parts.append(
-                f"The matched source is {result.matched_source}; source and chord labels are probabilistic."
-            )
+            if result.matched_range == "source chord events":
+                parts.append(
+                    f"The matched source is {result.matched_source}; "
+                    "source and chord labels are probabilistic."
+                )
+            else:
+                parts.append(
+                    f"The matched source is {result.matched_source}; "
+                    "source evidence is probabilistic."
+                )
+        if (
+            isinstance(result, SimilarityResult)
+            and result.matched_entity_type is not None
+            and result.matched_source is None
+            and result.matched_stem is None
+        ):
+            parts.append(f"The matched entity type is {result.matched_entity_type}.")
         if isinstance(result, SimilarityResult) and result.matched_range is not None:
             parts.append(f"The matched range is {result.matched_range}.")
         if isinstance(result, SimilarityResult) and result.feedback_adjustment:

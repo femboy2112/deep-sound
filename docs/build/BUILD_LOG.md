@@ -112,6 +112,24 @@ Append-only journal of build sessions. Newest entries at the top.
   - `python3 scripts/status.py`
   - `python3 scripts/toolset_review.py`
 
+## 2026-05-20 — Phase 5 advanced similarity slice
+
+- **Agent:** Codex
+- **Scope:** Open Phase 5 and implement deterministic advanced similarity feature families.
+- **Rows touched:** P5-001 .. P5-013 → DONE; P5-014 in progress for closeout.
+- **Changes:**
+  - Added Phase 5 plan rows and promoted `ACTIVE_PHASE` to 5 with a deterministic proxy boundary decision.
+  - Added production texture and melody contour analyzers using lightweight signal descriptors with confidence-bounded outputs.
+  - Added additive `AnalysisService` methods for production texture, structure sequence features, melody contour, and source timbre proxies without changing `analyze()`.
+  - Added production, structure, melody, vocal timbre, source-role, and advanced search modes over normalized per-dimension scores.
+  - Extended import-safe query/result DTOs and explanations with Phase 5 metadata while preserving chord-specific caveats.
+- **Verification:**
+  - `uv run pytest tests/test_update_plan.py`
+  - `uv run pytest tests/test_similarity.py tests/test_stem_search.py tests/test_chord_similarity.py tests/test_feedback_reranking.py tests/test_explanation_service.py tests/test_ui_models.py tests/test_source_graph_ui.py tests/test_correction_ui_models.py tests/test_phase3_ui_models.py tests/test_production_texture.py tests/test_phase5_analysis_service.py tests/test_structure_features.py tests/test_melody_contour.py tests/test_phase5_similarity.py tests/test_source_role_matching.py tests/test_phase5_ui_models.py tests/test_phase5_explanations.py`
+  - `python3 scripts/verify.py`
+- **Notes:**
+  - The first melody contour implementation used `librosa.piptrack`, but this environment segfaulted in numba during tests. It was replaced with an STFT dominant-bin contour proxy to keep core verification stable and dependency-light.
+
 ## 2026-05-20 — Phase 1 storage and library import
 
 - **Agent:** Codex

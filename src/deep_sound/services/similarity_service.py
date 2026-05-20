@@ -19,6 +19,12 @@ class SearchMode(StrEnum):
     WEIGHTED = "weighted"
     SOURCE_CHORDS = "source_chords"
     CHORD_CHANGE = "chord_change"
+    PRODUCTION = "production"
+    STRUCTURE = "structure"
+    MELODY = "melody"
+    VOCAL_TIMBRE = "vocal_timbre"
+    SOURCE_ROLE = "source_role"
+    ADVANCED = "advanced"
 
 
 MODE_FEATURE_TYPES: dict[SearchMode, tuple[FeatureType, ...]] = {
@@ -32,6 +38,22 @@ MODE_FEATURE_TYPES: dict[SearchMode, tuple[FeatureType, ...]] = {
     ),
     SearchMode.SOURCE_CHORDS: (FeatureType.HARMONY_CHORD_SEQUENCE,),
     SearchMode.CHORD_CHANGE: (FeatureType.HARMONY_CHORD_CHANGE,),
+    SearchMode.PRODUCTION: (FeatureType.PRODUCTION_TEXTURE,),
+    SearchMode.STRUCTURE: (FeatureType.STRUCTURE_SECTION_SEQUENCE,),
+    SearchMode.MELODY: (FeatureType.MELODY_CONTOUR,),
+    SearchMode.VOCAL_TIMBRE: (FeatureType.TIMBRE_EMBEDDING,),
+    SearchMode.SOURCE_ROLE: (
+        FeatureType.MELODY_CONTOUR,
+        FeatureType.TIMBRE_EMBEDDING,
+        FeatureType.HARMONY_CHORD_SEQUENCE,
+    ),
+    SearchMode.ADVANCED: (
+        FeatureType.PRODUCTION_TEXTURE,
+        FeatureType.STRUCTURE_SECTION_SEQUENCE,
+        FeatureType.MELODY_CONTOUR,
+        FeatureType.TIMBRE_EMBEDDING,
+        FeatureType.HARMONY_CHORD_SEQUENCE,
+    ),
 }
 
 
@@ -44,6 +66,7 @@ class SimilarityResult:
     matched_stem: str | None = None
     matched_source: str | None = None
     matched_range: str | None = None
+    matched_entity_type: str | None = None
     caveats: tuple[str, ...] = ()
     baseline_score: float | None = None
     feedback_adjustment: float = 0.0
@@ -138,23 +161,22 @@ class SimilarityService:
                 owner_type=owner_type,
                 matched_stem=candidate_id,
                 matched_range="full stem",
+                matched_entity_type=owner_type.value,
                 caveats=("Stem-level match is probabilistic.", *caveats),
                 baseline_score=baseline_score,
                 feedback_adjustment=feedback_adjustment,
             )
         if owner_type is OwnerType.SOURCE:
+            matched_range, source_caveats = _source_result_metadata(dimension_scores)
             return SimilarityResult(
                 owner_id=candidate_id,
                 score=adjusted_score,
                 dimension_scores=dimension_scores,
                 owner_type=owner_type,
                 matched_source=candidate_id,
-                matched_range="source chord events",
-                caveats=(
-                    "Source-specific chord match is probabilistic.",
-                    "Low-confidence chord labels should be checked before use.",
-                    *caveats,
-                ),
+                matched_range=matched_range,
+                matched_entity_type=owner_type.value,
+                caveats=(*source_caveats, *caveats),
                 baseline_score=baseline_score,
                 feedback_adjustment=feedback_adjustment,
             )
@@ -163,6 +185,7 @@ class SimilarityService:
             score=adjusted_score,
             dimension_scores=dimension_scores,
             owner_type=owner_type,
+            matched_entity_type=owner_type.value,
             caveats=caveats,
             baseline_score=baseline_score,
             feedback_adjustment=feedback_adjustment,
@@ -211,6 +234,22 @@ class SimilarityService:
         return self.search(
             query_id=query_id,
             weights=weights,
+            top_k=top_k,
+            owner_type=OwnerType.SOURCE,
+        )
+
+    def search_source_roles(
+        self,
+        query_id: str,
+        *,
+        top_k: int = 10,
+    ) -> list[SimilarityResult]:
+        return self.search(
+            query_id=query_id,
+            weights={
+                feature_type.value: 1.0
+                for feature_type in MODE_FEATURE_TYPES[SearchMode.SOURCE_ROLE]
+            },
             top_k=top_k,
             owner_type=OwnerType.SOURCE,
         )
@@ -272,3 +311,33 @@ def cosine_score(left: list[float], right: list[float]) -> float:
     if left_norm == 0.0 or right_norm == 0.0:
         return 0.0
     return max(0.0, min(1.0, dot / (left_norm * right_norm)))
+
+
+def _source_result_metadata(
+    dimension_scores: dict[str, float],
+) -> tuple[str, tuple[str, ...]]:
+    dimensions = set(dimension_scores)
+    if dimensions <= {
+        FeatureType.HARMONY_CHORD_SEQUENCE.value,
+        FeatureType.HARMONY_CHORD_CHANGE.value,
+    }:
+        return (
+            "source chord events",
+            (
+                "Source-specific chord match is probabilistic.",
+                "Low-confidence chord labels should be checked before use.",
+            ),
+        )
+    if (
+        FeatureType.MELODY_CONTOUR.value in dimensions
+        and FeatureType.TIMBRE_EMBEDDING.value in dimensions
+    ):
+        return (
+            "source melody and timbre features",
+            ("Source-role match uses probabilistic routed source evidence.",),
+        )
+    if FeatureType.MELODY_CONTOUR.value in dimensions:
+        return ("source melody contour", ("Melody contour evidence is probabilistic.",))
+    if FeatureType.TIMBRE_EMBEDDING.value in dimensions:
+        return ("source timbre proxy", ("Source timbre evidence is probabilistic.",))
+    return ("source features", ("Source-level match is probabilistic.",))

@@ -14,6 +14,11 @@ class QueryWeights:
     chord_change: float = 0.0
     source_behavior: float = 0.0
     timbre: float = 0.50
+    production: float = 0.0
+    structure: float = 0.0
+    melody: float = 0.0
+    vocal_timbre: float = 0.0
+    source_role: float = 0.0
 
     def normalized_phase1_weights(self) -> dict[str, float]:
         weights = {
@@ -36,6 +41,41 @@ class QueryWeights:
             weights["harmony.chord_sequence"] = source_behavior
         total = sum(weights.values())
         return {key: value / total for key, value in weights.items()}
+
+    def normalized_phase5_weights(self) -> dict[str, float]:
+        weights = self.normalized_phase3_weights()
+        phase5 = {
+            "production.texture": max(0.0, self.production),
+            "structure.section_sequence": max(0.0, self.structure),
+            "melody.contour": max(0.0, self.melody),
+            "timbre.embedding": max(0.0, self.vocal_timbre),
+            "source_role": max(0.0, self.source_role),
+        }
+        weights.update({key: value for key, value in phase5.items() if value > 0.0})
+        total = sum(weights.values())
+        if total <= 0.0:
+            return {"production.texture": 1.0}
+        return {key: value / total for key, value in weights.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class Phase5QueryControlState:
+    production_enabled: bool = True
+    structure_enabled: bool = True
+    melody_enabled: bool = False
+    vocal_timbre_enabled: bool = False
+    source_role_enabled: bool = False
+
+
+def phase5_query_control_state(source_type: SourceType | None) -> Phase5QueryControlState:
+    source_compatible = source_type in {SourceType.MELODIC, SourceType.PITCHED_HARMONIC}
+    return Phase5QueryControlState(
+        production_enabled=True,
+        structure_enabled=True,
+        melody_enabled=source_compatible,
+        vocal_timbre_enabled=source_compatible,
+        source_role_enabled=source_compatible,
+    )
 
 
 @dataclass(frozen=True, slots=True)
