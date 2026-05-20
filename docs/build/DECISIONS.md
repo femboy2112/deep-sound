@@ -68,3 +68,9 @@ Correction learning, user-edited chord truth, and ranking updates from feedback 
 Phase 4 stores user corrections as reversible overrides and feedback records. Raw analyzer output, source records, chord events, feature views, and baseline similarity scores remain inspectable without mutation.
 
 Correction-aware ranking is deterministic and bounded: relevant feedback may add a small transparent boost, irrelevant feedback may add a small transparent penalty, and final scores stay normalized to `[0, 1]`. Phase 4 does not train models, rewrite embeddings, or present user-edited labels as analyzer truth.
+
+## 2026-05-20 — Phase 5 deterministic advanced similarity boundary
+
+Phase 5 starts with deterministic, lightweight proxy features for production texture, structure, melody contour, vocal/source timbre, and source-role matching. Learned embeddings, heavy extras, and model-backed separation or melody systems remain optional follow-up work unless a later row explicitly requires them.
+
+Advanced dimensions remain separate, normalized similarity evidence. Phase 5 must not collapse results into one opaque embedding, bypass source routing, mutate raw analyzer output, or present production, melody, structure, source-role, chord, or vocal labels as definitive.

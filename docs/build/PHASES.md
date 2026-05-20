@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 4
+**ACTIVE_PHASE:** 5
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
