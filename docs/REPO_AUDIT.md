@@ -1,14 +1,15 @@
 # Repo Audit
 
-This audit inventories the Deep-Sound repository during the Phase 14 MIR quality baseline pass on 2026-05-21. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
+This audit inventories the Deep-Sound repository during the Phase 15 beta testing and usability campaign on 2026-05-21. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
 
 ## Executive Summary
 
-- `ACTIVE_PHASE: 14`; Phase 14 rows define generated MIR quality evidence, the dependency-light `quality` profile, deterministic analyzer upgrades, and search/explanation regressions.
+- `ACTIVE_PHASE: 15`; Phase 15 rows define the beta campaign runner, report contract metadata, `quality` profile indexing/search coverage, manual usability scenario reporting, and low-risk UI usability states.
 - The runtime now covers a dependency-light desktop beta seam plus interactive wiring DTOs: app/session config, import/analyze/index/search/waveform/clip/feedback controller intents, index/job snapshots, hydrated result cards, source detail DTOs, selected-track waveform/clip state, clip-owned features, and optional PySide widget factories.
 - `source_aware` remains the fake-provider route; `source_aware_real` is the explicit Demucs-backed opt-in path.
 - `scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto` records required generated-fixture workflow evidence and runs installed PySide/Demucs/playback smoke when available.
-- `scripts/mir_quality_eval.py --fixture-mode generated --strict` records required Phase 14 deterministic MIR quality evidence in `.build/mir_quality_report.*`.
+- `scripts/beta_campaign.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy off` records the required Phase 15 evidence bundle in `.build/beta_campaign_report.*`.
+- `scripts/mir_quality_eval.py --fixture-mode generated --strict` records required deterministic MIR quality evidence in `.build/mir_quality_report.*`.
 - The `[playback]` extra adds `sounddevice` for explicitly enabled local output; default verification does not open audio devices.
 - The `[demucs]` extra now pins `torch` and `torchaudio` to uv's explicit `pytorch-cpu` index. CUDA/NVIDIA/Triton packages are not part of the default CPU Demucs path.
 - Core verification remains intentionally light: no required FAISS, PySide, Demucs, learned embeddings, cloud services, packaging installers, or heavy MIR extras.
@@ -32,7 +33,7 @@ This audit inventories the Deep-Sound repository during the Phase 14 MIR quality
 | Feature lifecycle | Active | SQLite has feature upsert/replacement APIs, track analysis status updates, and failed-analysis job records. |
 | Searchable profile | Active | `searchable` materializes full-mix rhythm/chroma/MFCC plus production texture and structure features. |
 | Source-aware profile | Beta seam | `source_aware` uses `FakeSeparationProvider` in core tests; `source_aware_real` uses `DemucsProvider` and fails clearly when Demucs is absent. |
-| Indexing | Active | `IndexService.build_profile()` builds profile-matched indexes using FAISS wrapper or NumPy fallback. |
+| Indexing | Active | `IndexService.build_profile()` builds profile-matched indexes using FAISS wrapper or NumPy fallback and records unavailable profile dimensions as explicit scan caveats instead of aborting the whole profile. |
 | Search retrieval | Active | `SimilarityService` separates retrieval/rerank, discloses backend, falls back to scans, and filters incompatible source types for source searches. |
 | CLI workflow | Active | `analyze-library --profile`, `index-library --profile`, and `search-library --show-titles --explain` cover the beta path; `--profile source_aware_real` is the opt-in real-source smoke route. |
 | Clip/window | Active | `ClipWindow`, SQLite `clip_windows`, and `ClipAnalysisService` support clip-owned rhythm/harmony/timbre feature rows under app data. |
@@ -40,6 +41,7 @@ This audit inventories the Deep-Sound repository during the Phase 14 MIR quality
 | UI workflow | Interactive beta seam | `ui/library_workflow.py` maps import/analyze/index/search/progress/warnings/results/waveform/clip/feedback/playback DTOs without importing PySide; `ui/main_window.py` adds controller-backed action binding. |
 | Playback | Beta transport | `PlaybackService` stays inspection-safe by default; `LocalPlaybackAdapter(audio_output_enabled=True)` uses `soundfile`/`sounddevice`, clamps seeks, stops output, and reports device/decode errors as failed state. |
 | MIR quality evidence | Active | `scripts/mir_quality_eval.py` runs generated-fixture checks for tempo, chord/chroma, melody contour, drum groove, bass motion, source routing, and confidence bounds. |
+| Beta campaign evidence | Active | `scripts/beta_campaign.py` aggregates verify, generated live QA, strict MIR quality, strict repo dive, and toolset-review evidence with report contract metadata. |
 | Desktop settings | Active | `ui/session_config.py` persists library DB, app data dir, active profile, and last query state. |
 | Result inspection | Active | Result cards retain backend, stale-index warnings, caveats, dimension scores, preview/compare metadata, and feedback action intents. |
 | Source detail | Active | Source graph/detail DTOs expose confidence, compatible source search actions, correction gating, and correction metadata. |
@@ -107,6 +109,18 @@ This audit inventories the Deep-Sound repository during the Phase 14 MIR quality
 | `src/deep_sound/services/similarity_service.py` / `src/deep_sound/services/explanation_service.py` | Quality search regression surface and confidence-language guardrails. |
 | `tests/test_phase14_*.py` / `tests/test_mir_quality_eval.py` | Focused generated-fixture, profile, analyzer, search, and confidence-language coverage. |
 
+## Key Files Added Or Advanced In Phase 15
+
+| Path | Purpose |
+|---|---|
+| `scripts/report_contracts.py` | Shared schema, environment, dependency-policy, skip, and follow-up metadata helpers for generated reports. |
+| `scripts/beta_campaign.py` | Phase 15 campaign runner that aggregates verify, live QA, MIR quality, repo dive, and toolset review evidence. |
+| `scripts/live_qa.py` | Adds Phase 15 report metadata and manual usability task results while preserving optional-gate policy semantics. |
+| `scripts/mir_quality_eval.py` | Adds Phase 15 report metadata to generated quality evidence. |
+| `src/deep_sound/services/index_service.py` | Adds `quality` profile indexing and unavailable-dimension caveats. |
+| `src/deep_sound/ui/main_window.py` | Adds import-safe usability state DTOs, action gating, empty/error state labels, and deterministic widget object names. |
+| `tests/test_phase15_*.py` / `tests/test_beta_campaign.py` | Focused campaign, report-contract, quality indexing/workflow, manual usability, and UI state coverage. |
+
 ## Governance And Control Plane
 
 | Path | Status | Notes |
@@ -116,15 +130,15 @@ This audit inventories the Deep-Sound repository during the Phase 14 MIR quality
 | `.codex/CODEX_AGENT_MAP.md` | Active | Role/delegation map used by current runs. |
 | `.claude/` | Active | Claude-oriented commands/agents/hooks remain available. |
 | `docs/AGENT_HARNESS_SPEC.md` | Active | Shared control-plane contract. |
-| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 14 MIR quality boundary. |
+| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 15 beta testing/usability boundary. |
 | `docs/build/FILE_PLAN.md` | Active | Mutated only through `scripts/update_plan.py`. |
-| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 14. |
-| `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 14 closeout is current when P14-010 completes. |
+| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 15. |
+| `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 15 closeout is current when P15-010 completes. |
 | `scripts/toolset_review.py` | Active | Suggest-only review; no auto-edits. |
 
 ## Manual QA Checklist
 
-See `docs/desktop_beta_manual_qa.md` for the Phase 14 desktop beta checklist. It covers generated-fixture live QA evidence, generated MIR quality evidence, service workflow, waveform/clip state, clip-owned feature materialization, result/source actions, feedback, optional PySide smoke steps, CPU real-Demucs smoke steps, and optional playback smoke steps.
+See `docs/desktop_beta_manual_qa.md` for the Phase 15 desktop beta checklist. It covers the beta campaign runner, generated-fixture live QA evidence, generated MIR quality evidence, service workflow, quality profile indexing, waveform/clip state, clip-owned feature materialization, result/source actions, feedback, optional PySide smoke steps, CPU real-Demucs smoke steps, and optional playback smoke steps.
 
 ## Remaining Gaps
 
@@ -137,6 +151,7 @@ See `docs/desktop_beta_manual_qa.md` for the Phase 14 desktop beta checklist. It
 ## Closeout Checks
 
 - `python3 scripts/verify.py`
+- `python3 scripts/beta_campaign.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy off`
 - `python3 scripts/mir_quality_eval.py --fixture-mode generated --strict`
 - `python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto`
 - `QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke --run-demucs-smoke --run-playback-smoke --real-smoke-policy required --playback-smoke-policy required`

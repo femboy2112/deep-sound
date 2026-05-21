@@ -69,6 +69,26 @@ class MainWindowActionMap:
     selected_track_search: SearchIntentDTO | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class UsabilityActionState:
+    action_id: str
+    label: str
+    enabled: bool
+    reason: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MainWindowUsabilityState:
+    library_empty_state: str
+    queue_empty_state: str
+    result_empty_state: str
+    waveform_empty_state: str
+    source_graph_empty_state: str
+    playback_status_text: str
+    actions: tuple[UsabilityActionState, ...]
+    error_states: tuple[str, ...] = ()
+
+
 def main_window_action_map(
     *,
     active_profile: AnalysisProfile,
@@ -94,12 +114,89 @@ def main_window_action_map(
     )
 
 
+def main_window_usability_state(
+    *,
+    track_count: int,
+    job_count: int = 0,
+    result_count: int = 0,
+    selected_track_id: str | None = None,
+    selected_source_id: str | None = None,
+    selected_result_id: str | None = None,
+    failed_job_count: int = 0,
+    stale_index_warning_count: int = 0,
+    playback_error: str | None = None,
+) -> MainWindowUsabilityState:
+    has_tracks = track_count > 0
+    has_selection = selected_track_id is not None
+    error_states: list[str] = []
+    if failed_job_count:
+        error_states.append(f"{failed_job_count} failed job(s) need review.")
+    if stale_index_warning_count:
+        error_states.append("Search indexes may be stale; scan fallback remains available.")
+    if playback_error:
+        error_states.append(f"Playback unavailable: {playback_error}")
+    actions = (
+        UsabilityActionState(
+            "analyze_library",
+            "Analyze",
+            has_tracks,
+            "" if has_tracks else "Import tracks before analysis.",
+        ),
+        UsabilityActionState(
+            "build_index",
+            "Reindex",
+            has_tracks,
+            "" if has_tracks else "Import and analyze tracks before indexing.",
+        ),
+        UsabilityActionState(
+            "search_selected",
+            "Search Selected",
+            has_selection,
+            "" if has_selection else "Select a track before searching.",
+        ),
+        UsabilityActionState(
+            "play_selected",
+            "Play",
+            has_selection,
+            "" if has_selection else "Select a track before playback.",
+        ),
+        UsabilityActionState(
+            "source_search",
+            "Search Source",
+            selected_source_id is not None,
+            "" if selected_source_id is not None else "Select a compatible source first.",
+        ),
+        UsabilityActionState(
+            "result_feedback",
+            "Mark Relevant",
+            selected_result_id is not None,
+            "" if selected_result_id is not None else "Select a result before feedback.",
+        ),
+    )
+    return MainWindowUsabilityState(
+        library_empty_state="" if has_tracks else "No tracks imported.",
+        queue_empty_state="" if job_count else "No queued jobs.",
+        result_empty_state="" if result_count else "No search results.",
+        waveform_empty_state="" if has_selection else "Select a track to inspect its waveform.",
+        source_graph_empty_state="" if selected_source_id else "No source selected.",
+        playback_status_text=(
+            f"Playback failed: {playback_error}" if playback_error else "Playback ready."
+        ),
+        actions=actions,
+        error_states=tuple(error_states),
+    )
+
+
 @dataclass(slots=True)
 class MainWindowActionBinder:
     controller: MainWindowController
     active_profile: AnalysisProfile
     selected_track_id: str | None = None
     search_mode: str = "weighted"
+
+    @property
+    def can_use_selected_track_actions(self) -> bool:
+        return self.selected_track_id is not None
 
     def set_selected_track(self, track_id: str | None) -> None:
         self.selected_track_id = track_id
@@ -198,6 +295,7 @@ def create_main_window(
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import (
             QAbstractItemView,
+            QApplication,
             QFileDialog,
             QHBoxLayout,
             QHeaderView,
@@ -216,6 +314,7 @@ def create_main_window(
             "Install deep-sound with the [ui] extra to create PySide widgets."
         ) from exc
 
+    QApplication.instance() or QApplication(["deep-sound-main-window"])
     window = QMainWindow()
     window.setWindowTitle("Deep-Sound")
 
@@ -240,6 +339,18 @@ def create_main_window(
     play_button = QPushButton("Play")
     pause_button = QPushButton("Pause")
     stop_button = QPushButton("Stop")
+    for name, widget in (
+        ("importFileButton", import_file_button),
+        ("importFolderButton", import_folder_button),
+        ("analyzeButton", analyze_button),
+        ("reindexButton", reindex_button),
+        ("refreshButton", refresh_button),
+        ("searchSelectedButton", search_button),
+        ("playButton", play_button),
+        ("pauseButton", pause_button),
+        ("stopButton", stop_button),
+    ):
+        widget.setObjectName(name)
     toolbar.addWidget(import_file_button)
     toolbar.addWidget(import_folder_button)
     toolbar.addWidget(analyze_button)
@@ -250,11 +361,13 @@ def create_main_window(
     toolbar.addWidget(pause_button)
     toolbar.addWidget(stop_button)
     filter_box = QLineEdit()
+    filter_box.setObjectName("libraryFilter")
     filter_box.setPlaceholderText("Filter library")
     toolbar.addWidget(filter_box)
     layout.addLayout(toolbar)
 
     table = QTableWidget(0, 5)
+    table.setObjectName("libraryTable")
     table.setHorizontalHeaderLabels(["Title", "Artist", "Duration", "Status", "Track ID"])
     table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -268,6 +381,20 @@ def create_main_window(
         ):
             table.setItem(index, column, QTableWidgetItem(value))
     layout.addWidget(table)
+    library_empty_label = QLabel("No tracks imported.")
+    library_empty_label.setObjectName("libraryEmptyState")
+    library_empty_label.setVisible(not tracks)
+    layout.addWidget(library_empty_label)
+
+    def set_selected_actions_enabled(enabled: bool) -> None:
+        search_button.setEnabled(enabled)
+        play_button.setEnabled(enabled)
+        pause_button.setEnabled(enabled)
+        stop_button.setEnabled(enabled)
+
+    analyze_button.setEnabled(bool(tracks))
+    reindex_button.setEnabled(bool(tracks))
+    set_selected_actions_enabled(False)
 
     if binder is not None:
 
@@ -277,18 +404,22 @@ def create_main_window(
 
         def sync_selection() -> None:
             binder.set_selected_track(selected_track_id())
+            set_selected_actions_enabled(binder.can_use_selected_track_actions)
 
         def import_folder() -> None:
             path = QFileDialog.getExistingDirectory(window)
-            binder.import_folder(None if not path else Path(path))
+            if binder.import_folder(None if not path else Path(path)) is not None:
+                binder.refresh()
 
         def search_selected() -> None:
             sync_selection()
-            binder.search_selected()
+            if binder.search_selected() is not None:
+                binder.refresh()
 
         def play_selected() -> None:
             sync_selection()
-            binder.play_selected()
+            if binder.play_selected() is not None:
+                binder.refresh()
 
         def pause_selected() -> None:
             sync_selection()
@@ -300,8 +431,11 @@ def create_main_window(
 
         table.itemSelectionChanged.connect(sync_selection)
         import_file_button.clicked.connect(
-            lambda: binder.import_files(
-                [Path(path) for path, _filter in [QFileDialog.getOpenFileName(window)] if path]
+            lambda: (
+                binder.import_files(
+                    [Path(path) for path, _filter in [QFileDialog.getOpenFileName(window)] if path]
+                ),
+                binder.refresh(),
             )
         )
         import_folder_button.clicked.connect(import_folder)
@@ -314,6 +448,7 @@ def create_main_window(
         stop_button.clicked.connect(stop_selected)
 
     queue_label = QLabel("Analysis Queue")
+    queue_label.setObjectName("queueLabel")
     layout.addWidget(queue_label)
     for job in queue_rows(jobs):
         progress = QProgressBar()
@@ -325,6 +460,7 @@ def create_main_window(
 
     if not jobs:
         idle = QLabel(JobState.QUEUED.value.title() + " jobs will appear here")
+        idle.setObjectName("queueEmptyState")
         layout.addWidget(idle)
 
     window.setCentralWidget(root)

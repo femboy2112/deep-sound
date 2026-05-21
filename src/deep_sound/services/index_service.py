@@ -44,6 +44,21 @@ INDEX_PROFILE_FEATURES: dict[AnalysisProfile, tuple[tuple[OwnerType, FeatureType
         (OwnerType.SOURCE, FeatureType.MELODY_CONTOUR),
         (OwnerType.SOURCE, FeatureType.TIMBRE_EMBEDDING),
     ),
+    AnalysisProfile.QUALITY: (
+        (OwnerType.TRACK, FeatureType.RHYTHM_GLOBAL),
+        (OwnerType.TRACK, FeatureType.HARMONY_CHROMA),
+        (OwnerType.TRACK, FeatureType.TIMBRE_MFCC_STATS),
+        (OwnerType.TRACK, FeatureType.PRODUCTION_TEXTURE),
+        (OwnerType.TRACK, FeatureType.STRUCTURE_SECTION_SEQUENCE),
+        (OwnerType.STEM, FeatureType.RHYTHM_DRUM),
+        (OwnerType.STEM, FeatureType.BASS_ROOT_MOTION),
+        (OwnerType.STEM, FeatureType.HARMONY_CHROMA),
+        (OwnerType.STEM, FeatureType.TIMBRE_MFCC_STATS),
+        (OwnerType.SOURCE, FeatureType.HARMONY_CHORD_SEQUENCE),
+        (OwnerType.SOURCE, FeatureType.HARMONY_CHORD_CHANGE),
+        (OwnerType.SOURCE, FeatureType.MELODY_CONTOUR),
+        (OwnerType.SOURCE, FeatureType.TIMBRE_EMBEDDING),
+    ),
     AnalysisProfile.SOURCE_AWARE_REAL: (
         (OwnerType.TRACK, FeatureType.RHYTHM_GLOBAL),
         (OwnerType.TRACK, FeatureType.HARMONY_CHROMA),
@@ -135,10 +150,15 @@ class IndexService:
 
     def build_profile(self, profile: AnalysisProfile | str) -> tuple[IndexStatus, ...]:
         selected_profile = normalize_analysis_profile(profile)
-        return tuple(
-            self.build_index(feature_type, owner_type=owner_type)
-            for owner_type, feature_type in INDEX_PROFILE_FEATURES[selected_profile]
-        )
+        statuses: list[IndexStatus] = []
+        for owner_type, feature_type in INDEX_PROFILE_FEATURES[selected_profile]:
+            try:
+                statuses.append(self.build_index(feature_type, owner_type=owner_type))
+            except ValueError as exc:
+                if not str(exc).startswith("No persisted feature views"):
+                    raise
+                statuses.append(self.status(feature_type, owner_type=owner_type))
+        return tuple(statuses)
 
     def status(
         self,

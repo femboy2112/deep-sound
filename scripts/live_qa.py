@@ -19,8 +19,11 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src"
+SCRIPTS_ROOT = REPO_ROOT / "scripts"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
 
 try:
     import numpy as np
@@ -31,6 +34,15 @@ except ModuleNotFoundError:
     env = os.environ.copy()
     env["DEEP_SOUND_LIVE_QA_REEXEC"] = "1"
     os.execvpe("uv", ["uv", "run", "python3", str(Path(__file__).resolve()), *sys.argv[1:]], env)
+
+from report_contracts import (
+    SCHEMA_VERSION,
+    command_metadata,
+    dependency_policy,
+    follow_up_items_from_gates,
+    known_skips_from_gates,
+    runtime_environment,
+)
 
 from deep_sound.domain.corrections import ResultFeedbackValue
 from deep_sound.domain.feature_view import OwnerType
@@ -65,7 +77,25 @@ class GateResult:
 
 
 @dataclass(frozen=True, slots=True)
+class UsabilityTaskResult:
+    task_id: str
+    action: str
+    expected_result: str
+    observed_result: str
+    status: str
+    dependency_mode: str
+    evidence_paths: list[str] = field(default_factory=list)
+    follow_up_recommendation: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class LiveQAReport:
+    schema_version: str
+    command: list[str]
+    environment: dict[str, Any]
+    dependency_policy: dict[str, Any]
+    inputs: dict[str, Any]
+    artifacts: dict[str, str]
     timestamp: str
     overall: str
     fixture_mode: str
@@ -73,6 +103,9 @@ class LiveQAReport:
     app_data_dir: str
     required_gates: list[GateResult]
     optional_gates: list[GateResult]
+    known_skips: list[dict[str, str]]
+    follow_up_items: list[dict[str, str]]
+    manual_usability_tasks: list[UsabilityTaskResult] = field(default_factory=list)
 
 
 def _utc_timestamp() -> str:
@@ -598,9 +631,110 @@ def _optional_playback_gate(*, run: bool, required: bool, run_dir: Path) -> Gate
     )
 
 
-def _report_overall(required: list[GateResult], optional: list[GateResult]) -> str:
-    failures = [gate for gate in (*required, *optional) if gate.status == "failed"]
+def _report_overall(
+    required: list[GateResult],
+    optional: list[GateResult],
+    *,
+    required_optional_names: set[str],
+) -> str:
+    failures = [gate for gate in required if gate.status == "failed"]
+    failures.extend(
+        gate
+        for gate in optional
+        if gate.status == "failed" and gate.name in required_optional_names
+    )
     return "fail" if failures else "pass"
+
+
+def _manual_usability_tasks(
+    required: list[GateResult],
+    optional: list[GateResult],
+    *,
+    run_dir: Path,
+) -> list[UsabilityTaskResult]:
+    gate_by_name = {gate.name: gate for gate in (*required, *optional)}
+    task_specs = [
+        (
+            "U-IMPORT",
+            "Import a generated folder containing valid audio and one broken file.",
+            "Valid files appear in the library and the broken file is recorded as a failed job.",
+            "import",
+            "required",
+        ),
+        (
+            "U-ANALYZE-INDEX",
+            "Analyze and index the generated library.",
+            "The searchable profile completes, reruns idempotently, and index statuses are available.",
+            "index",
+            "required",
+        ),
+        (
+            "U-SEARCH",
+            "Run a library search from the generated query track.",
+            "Results include backend and dimension-score evidence.",
+            "search",
+            "required",
+        ),
+        (
+            "U-WAVEFORM-CLIP",
+            "Build a waveform cache, select a clip, and search from clip-owned features.",
+            "Waveform and clip artifacts stay under app data and clip search returns results.",
+            "clip",
+            "required",
+        ),
+        (
+            "U-FEEDBACK",
+            "Submit relevant feedback for the top generated result.",
+            "Feedback is recorded through the desktop controller.",
+            "feedback",
+            "required",
+        ),
+        (
+            "U-PYSIDE",
+            "Open the optional PySide desktop smoke when the UI extra is available.",
+            "Window creation passes or records an optional dependency skip.",
+            "pyside_smoke",
+            "optional",
+        ),
+        (
+            "U-PLAYBACK",
+            "Run the optional playback smoke under the selected playback policy.",
+            "Playback passes, fails, or records an optional dependency/device skip.",
+            "playback_smoke",
+            "optional",
+        ),
+    ]
+    tasks: list[UsabilityTaskResult] = []
+    for task_id, action, expected, gate_name, dependency_mode in task_specs:
+        gate = gate_by_name.get(gate_name)
+        if gate is None:
+            tasks.append(
+                UsabilityTaskResult(
+                    task_id=task_id,
+                    action=action,
+                    expected_result=expected,
+                    observed_result="No matching gate was recorded.",
+                    status="blocked",
+                    dependency_mode=dependency_mode,
+                    evidence_paths=[str(run_dir)],
+                    follow_up_recommendation="Record this scenario in live QA before closeout.",
+                )
+            )
+            continue
+        follow_up = "" if gate.status == "passed" else gate.summary
+        tasks.append(
+            UsabilityTaskResult(
+                task_id=task_id,
+                action=action,
+                expected_result=expected,
+                observed_result=gate.summary,
+                status=gate.status,
+                dependency_mode=dependency_mode,
+                evidence_paths=[str(run_dir), str(JSON_REPORT_PATH), str(MD_REPORT_PATH)],
+                follow_up_recommendation=follow_up,
+            )
+        )
+    return tasks
 
 
 def _write_reports(report: LiveQAReport) -> None:
@@ -638,6 +772,20 @@ def _markdown_report(report: LiveQAReport) -> str:
     )
     for gate in report.optional_gates:
         lines.append(f"| `{gate.name}` | `{gate.status}` | {gate.summary} |")
+    lines.extend(
+        [
+            "",
+            "## Manual Usability Tasks",
+            "",
+            "| Task | Status | Dependency mode | Observed result | Follow-up |",
+            "|---|---|---|---|---|",
+        ]
+    )
+    for task in report.manual_usability_tasks:
+        lines.append(
+            f"| `{task.task_id}` | `{task.status}` | `{task.dependency_mode}` | "
+            f"{task.observed_result} | {task.follow_up_recommendation or '-'} |"
+        )
     lines.extend(
         [
             "",
@@ -719,7 +867,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parse_args(sys.argv[1:] if argv is None else argv)
+    raw_argv = sys.argv[1:] if argv is None else argv
+    args = _parse_args(raw_argv)
     BUILD_DIR.mkdir(exist_ok=True)
     run_dir = args.run_dir or BUILD_DIR / "live_qa_runs" / _safe_stamp()
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -776,8 +925,39 @@ def main(argv: list[str] | None = None) -> int:
             run_dir=run_dir,
         )
     )
-    overall = _report_overall(required, optional)
+    required_optional_names: set[str] = set()
+    if required_real_smoke:
+        required_optional_names.update({"pyside_smoke", "real_source_smoke"})
+    if required_playback_smoke:
+        required_optional_names.add("playback_smoke")
+    overall = _report_overall(
+        required,
+        optional,
+        required_optional_names=required_optional_names,
+    )
+    all_gates = [*required, *optional]
+    command = command_metadata(["python3", "scripts/live_qa.py", *raw_argv])
     report = LiveQAReport(
+        schema_version=SCHEMA_VERSION,
+        command=command,
+        environment=runtime_environment(REPO_ROOT),
+        dependency_policy=dependency_policy(
+            real_smoke_policy=args.real_smoke_policy,
+            playback_smoke_policy=args.playback_smoke_policy,
+        ),
+        inputs={
+            "fixture_mode": args.fixture_mode,
+            "demucs_audio": None if args.demucs_audio is None else str(args.demucs_audio),
+            "demucs_executable": None
+            if args.demucs_executable is None
+            else str(args.demucs_executable),
+        },
+        artifacts={
+            "json_report": str(JSON_REPORT_PATH),
+            "markdown_report": str(MD_REPORT_PATH),
+            "run_dir": str(run_dir),
+            "app_data_dir": str(app_data_dir),
+        },
         timestamp=_utc_timestamp(),
         overall=overall,
         fixture_mode=args.fixture_mode,
@@ -785,6 +965,9 @@ def main(argv: list[str] | None = None) -> int:
         app_data_dir=str(app_data_dir),
         required_gates=required,
         optional_gates=optional,
+        known_skips=known_skips_from_gates(all_gates),
+        follow_up_items=follow_up_items_from_gates(all_gates),
+        manual_usability_tasks=_manual_usability_tasks(required, optional, run_dir=run_dir),
     )
     _write_reports(report)
 

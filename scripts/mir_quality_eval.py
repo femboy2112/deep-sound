@@ -14,8 +14,11 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src"
+SCRIPTS_ROOT = REPO_ROOT / "scripts"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
 
 try:
     import numpy as np
@@ -26,6 +29,15 @@ except ModuleNotFoundError:
     env = os.environ.copy()
     env["DEEP_SOUND_MIR_QUALITY_REEXEC"] = "1"
     os.execvpe("uv", ["uv", "run", "python3", str(Path(__file__).resolve()), *sys.argv[1:]], env)
+
+from report_contracts import (
+    SCHEMA_VERSION,
+    command_metadata,
+    dependency_policy,
+    follow_up_items_from_gates,
+    known_skips_from_gates,
+    runtime_environment,
+)
 
 from deep_sound.domain.feature_view import FeatureType
 from deep_sound.domain.track import Track
@@ -55,11 +67,21 @@ class QualityGate:
 
 @dataclass(frozen=True, slots=True)
 class MirQualityReport:
+    schema_version: str
+    command: list[str]
+    environment: dict[str, Any]
+    dependency_policy: dict[str, Any]
+    inputs: dict[str, Any]
+    artifacts: dict[str, str]
     timestamp: str
     overall: str
     fixture_mode: str
     run_dir: str
     gates: list[QualityGate]
+    required_gates: list[QualityGate]
+    optional_gates: list[QualityGate]
+    known_skips: list[dict[str, str]]
+    follow_up_items: list[dict[str, str]]
 
 
 def _utc_timestamp() -> str:
@@ -317,10 +339,12 @@ def write_reports(report: MirQualityReport) -> None:
     lines = [
         "# MIR Quality Report",
         "",
+        f"- Schema version: `{report.schema_version}`",
         f"- Timestamp: `{report.timestamp}`",
         f"- Fixture mode: `{report.fixture_mode}`",
         f"- Overall: `{report.overall}`",
         f"- Run dir: `{report.run_dir}`",
+        f"- Command: `{' '.join(report.command)}`",
         "",
         "## Gates",
         "",
@@ -347,11 +371,27 @@ def build_report(*, fixture_mode: str, output_dir: Path | None = None) -> MirQua
     gates = run_generated_quality(run_dir)
     overall = "passed" if all(gate.status == "passed" for gate in gates) else "failed"
     return MirQualityReport(
+        schema_version=SCHEMA_VERSION,
+        command=command_metadata(
+            ["python3", "scripts/mir_quality_eval.py", "--fixture-mode", fixture_mode]
+        ),
+        environment=runtime_environment(REPO_ROOT),
+        dependency_policy=dependency_policy(real_smoke_policy="off", playback_smoke_policy="off"),
+        inputs={"fixture_mode": fixture_mode},
+        artifacts={
+            "json_report": str(JSON_REPORT_PATH),
+            "markdown_report": str(MD_REPORT_PATH),
+            "run_dir": str(run_dir),
+        },
         timestamp=_utc_timestamp(),
         overall=overall,
         fixture_mode=fixture_mode,
         run_dir=str(run_dir),
         gates=gates,
+        required_gates=gates,
+        optional_gates=[],
+        known_skips=known_skips_from_gates(gates),
+        follow_up_items=follow_up_items_from_gates(gates),
     )
 
 

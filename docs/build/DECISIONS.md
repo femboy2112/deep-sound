@@ -156,3 +156,29 @@ The `quality` analysis profile reuses existing services, SQLite storage, and fak
 Analyzer upgrades remain deterministic proxies: chroma-change chord segmentation, smoothed melody contour, richer bass/drum/source-timbre stats, and quality search/explanation regressions. All inferred source, chord, event, and analyzer labels remain confidence-bounded and caveated. Similarity scores remain similarity evidence, not analyzer confidence.
 
 Real separation quality, broad human-curated corpus evaluation, learned MIR models, GPU acceleration, packaging, and commercial release work remain future work unless a later row explicitly scopes them.
+
+## 2026-05-21 — Phase 15 beta testing and usability campaign boundary
+
+Phase 15 promotes the beta evidence loop from separate scripts to one campaign
+runner. `scripts/beta_campaign.py --fixture-mode generated --real-smoke-policy
+off --playback-smoke-policy off` is the dependency-light campaign command and
+aggregates verify, generated live QA, strict generated MIR quality, strict repo
+dive, and suggest-only toolset review evidence.
+
+Generated reports share the Phase 15 metadata contract: schema version, command,
+environment, dependency policy, inputs, artifacts, required gates, optional
+gates, known skips, and follow-up items. Live QA additionally records manual
+usability tasks with passed, failed, blocked, and skipped-optional statuses.
+
+The `quality` profile is now indexable. Missing profile dimensions are recorded
+as unavailable scan-fallback statuses with caveats instead of aborting the whole
+profile, so partial deterministic quality evidence remains inspectable without
+overclaiming coverage. Retrieval and reranking remain separated, and similarity
+scores remain similarity evidence rather than analyzer confidence.
+
+Optional PySide, Demucs, and playback gates remain explicit host evidence. Under
+`auto`, optional failures are recorded as follow-up items; under `required`, the
+named optional gates are blocking failures. Default verification and default
+campaign closeout still must not require PySide, Demucs, playback devices,
+FAISS, GPU packages, learned models, cloud services, or the optional `[mir]`
+extra.

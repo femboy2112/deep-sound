@@ -12,7 +12,7 @@ Repo-control-plane docs live in:
 
 ## Status
 
-This repository is in **Phase 14 MIR quality baseline and deterministic analyzer upgrade**. Phase 14 keeps default verification dependency-light while adding generated-fixture quality evidence, the `quality` analysis profile, and upgraded deterministic chord, melody, bass, drum, source-timbre, and explanation paths. Real device output is never required by `make verify`; PySide, Demucs, playback devices, FAISS, learned models, cloud services, and heavier MIR extras remain explicit live QA gates.
+This repository is in **Phase 15 beta testing and usability campaign**. Phase 15 keeps default verification dependency-light while adding one campaign runner, stronger generated-report contracts, `quality` profile indexing/search coverage, manual usability scenario evidence, and low-risk desktop usability states. Real device output is never required by `make verify`; PySide, Demucs, playback devices, FAISS, learned models, cloud services, and heavier MIR extras remain explicit live QA gates whose outcomes are recorded separately.
 
 ## Quickstart
 
@@ -38,6 +38,9 @@ python3 scripts/live_qa.py --fixture-mode generated
 
 # Run generated-fixture MIR quality evidence
 python3 scripts/mir_quality_eval.py --fixture-mode generated --strict
+
+# Run the Phase 15 beta campaign evidence bundle
+python3 scripts/beta_campaign.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy off
 
 # Run installed real-smoke gates automatically, skipping only unavailable extras
 QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto

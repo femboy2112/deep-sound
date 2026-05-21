@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 14
+**ACTIVE_PHASE:** 15
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -281,3 +281,43 @@ default verification gate.
 - Phase closeout records status, quality harness, and toolset-review evidence.
 
 **FILE_PLAN ids:** `P14-001` .. `P14-0NN`.
+
+---
+
+## Phase 15 — Beta Testing And Usability Campaign
+
+**Goal:** Make the current beta testable as a coherent product workflow with a
+repeatable campaign runner, stronger report contracts, quality-profile indexing,
+desktop usability evidence, and low-risk interaction polish.
+
+**Required capabilities:**
+- Run one campaign command that records required evidence from verify, generated
+  live QA, strict generated MIR quality, strict repo dive, and suggest-only
+  toolset review.
+- Standardize generated evidence metadata for schema version, command,
+  environment, dependency policy, inputs, artifacts, required gates, optional
+  gates, known skips, and follow-up items.
+- Index the dependency-light `quality` profile and search quality-analyzed
+  libraries through CLI and desktop controller flows while preserving stale-index
+  caveats, scan fallback, and retrieval/rerank separation.
+- Add an operator usability report format covering task id, action, expected
+  result, observed result, status, dependency mode, evidence paths, and follow-up
+  recommendations.
+- Improve desktop usability states where tests expose friction: action gating
+  when nothing is selected, inspectable empty/error states, deterministic widget
+  object names, and clearer index/search/playback labels.
+
+**Exit criteria:**
+- `python3 scripts/verify.py` remains green without PySide, Demucs, playback
+  device, FAISS, GPU packages, learned models, cloud services, or `[mir]`.
+- `python3 scripts/beta_campaign.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy off`
+  writes `.build/beta_campaign_report.json` and `.build/beta_campaign_report.md`
+  with clear required, optional, skipped, failed, and follow-up evidence.
+- `quality` profile can be analyzed, indexed, and searched through CLI and
+  desktop controller flows.
+- UI usability states are inspectable and test-covered for empty, failed, stale,
+  invalid, and no-selection cases.
+- Optional-host outcomes are recorded under the selected policy; default Phase 15
+  closeout does not require fixing every optional-host failure.
+
+**FILE_PLAN ids:** `P15-001` .. `P15-0NN`.

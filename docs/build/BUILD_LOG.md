@@ -4,6 +4,30 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-21 — Phase 15 beta testing and usability campaign
+
+- **Agent:** Codex
+- **Scope:** Open and complete the Phase 15 beta testing and usability campaign.
+- **Rows touched:** P15-001 .. P15-010 → DONE.
+- **Changes:**
+  - Promoted `ACTIVE_PHASE` to 15 and documented the beta campaign boundary.
+  - Added `scripts/beta_campaign.py` and shared report metadata helpers for generated evidence.
+  - Added Phase 15 report contract fields to live QA and MIR quality reports.
+  - Added manual usability task results to live QA output.
+  - Added `quality` profile indexing with unavailable-dimension scan caveats and CLI/controller quality workflow coverage.
+  - Added main-window usability state DTOs, invalid-action gating, empty/error states, deterministic widget names, and direct factory `QApplication` safety.
+  - Refreshed README, manual QA, repo audit, and decisions for the record-all-optional-outcomes policy.
+- **Verification:**
+  - `uv run pytest tests/test_beta_campaign.py tests/test_phase15_quality_indexing.py tests/test_phase15_desktop_quality_workflow.py tests/test_phase15_ui_usability_states.py tests/test_phase15_campaign_report_contract.py tests/test_phase15_manual_usability_report.py tests/test_phase12_live_qa_policy.py tests/test_phase13_live_qa_playback_policy.py tests/test_mir_quality_eval.py`
+  - `env UV_CACHE_DIR=/tmp/uv-cache QT_QPA_PLATFORM=offscreen uv run pytest tests/test_phase8_* tests/test_phase9_* tests/test_phase11_track_detail_playback.py tests/test_phase14_* tests/test_mir_quality_eval.py tests/test_phase12_live_qa_policy.py tests/test_phase13_live_qa_playback_policy.py`
+  - `python3 scripts/verify.py`
+  - `python3 scripts/beta_campaign.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy off`
+- **Notes:**
+  - The first broad optional PySide regression command aborted because Qt was not run with offscreen platform; rerun with `QT_QPA_PLATFORM=offscreen` passed.
+  - The first campaign run exposed sandboxed uv cache writes; `scripts/beta_campaign.py` now sets `UV_CACHE_DIR=/tmp/uv-cache` for child gates.
+
+---
+
 ## 2026-05-21 — Phase 14 MIR quality baseline and analyzer upgrade
 
 - **Agent:** Codex
