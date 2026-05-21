@@ -4,6 +4,33 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-21 — Harness history dive tooling
+
+- **Agent:** Codex
+- **Scope:** Harness-first history audit tooling and mirrored review surface; no product behavior changes.
+- **Rows touched:** none; FILE_PLAN is exhausted at `ACTIVE_PHASE: 13`.
+- **Changes:**
+  - Added `scripts/repo_dive.py`, a stdlib-only read-only audit command with git/no-git modes, strict failure handling, JSON/Markdown reports, and a registry of history/failure-mode detectors.
+  - Added tests for parser behavior, detector output, no-git fallback, Markdown/JSON rendering, real historical regression fixtures, and toolset-review ingestion.
+  - Extended `scripts/toolset_review.py` to consume `.build/repo_dive_report.json` when present while remaining suggest-only.
+  - Added `docs/build/REPO_DIVE.md` as the durable curated first report.
+  - Added Codex skills for `history-dive` and `optional-gate-policy`.
+  - Added mirrored read-only `history-auditor` and `dependency-gate-auditor` roles under `.codex/agents/` and `.claude/agents/`.
+  - Updated harness docs and Codex role maps to expose the new command and roles.
+- **Verification:**
+  - `python3 scripts/repo_dive.py --strict`
+  - `uv run pytest tests/test_repo_dive.py tests/test_toolset_review.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy auto`
+  - `python3 scripts/verify.py`
+  - `python3 scripts/toolset_review.py`
+- **Notes:**
+  - The first strict report has 9 detectors and 0 strict failures.
+  - Watch-only findings are high-churn service/UI/storage/search areas and history-fix follow-up.
+  - Product implementation remains unchanged.
+
+---
+
 ## 2026-05-20 — Phase 13 real playback transport beta
 
 - **Agent:** Codex

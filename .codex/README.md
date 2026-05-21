@@ -28,6 +28,7 @@ This surface reuses the existing scripts:
 - `python3 scripts/repair.py`
 - `python3 scripts/update_plan.py`
 - `python3 scripts/toolset_review.py`
+- `python3 scripts/repo_dive.py`
 
 Do not fork those scripts into `.codex/scripts/` unless a later decision explicitly approves that split.
 
@@ -39,3 +40,7 @@ Do not fork those scripts into `.codex/scripts/` unless a later decision explici
 - Keep new work within the requested scope.
 - Treat labels and analysis outputs as probabilistic.
 - Keep self-review suggest-only.
+
+## History-Backed Review
+
+Use `python3 scripts/repo_dive.py --strict` before broad harness changes, optional dependency changes, or phase-closeout review. It writes `.build/repo_dive_report.{json,md}` and feeds `scripts/toolset_review.py` when that report is present.

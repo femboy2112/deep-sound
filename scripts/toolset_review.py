@@ -17,6 +17,7 @@ BUILD_DIR = REPO_ROOT / ".build"
 JSON_PATH = BUILD_DIR / "toolset_review.json"
 MARKDOWN_PATH = BUILD_DIR / "toolset_review.md"
 VERIFY_REPORT_PATH = BUILD_DIR / "verify_report.json"
+REPO_DIVE_REPORT_PATH = BUILD_DIR / "repo_dive_report.json"
 REPAIR_ATTEMPTS_PATH = BUILD_DIR / "repair_attempts.txt"
 CODEx_ROOT = REPO_ROOT / ".codex"
 CLAUDE_ROOT = REPO_ROOT / ".claude"
@@ -46,7 +47,7 @@ def read_repair_attempts() -> int:
         return 0
 
 
-def collect_recommendations() -> list[Recommendation]:
+def collect_recommendations(repo_dive_path: Path = REPO_DIVE_REPORT_PATH) -> list[Recommendation]:
     recs: list[Recommendation] = []
 
     if not CODEx_ROOT.exists():
@@ -150,7 +151,70 @@ def collect_recommendations() -> list[Recommendation]:
             )
         )
 
+    recs.extend(collect_repo_dive_recommendations(repo_dive_path))
     return recs
+
+
+def collect_repo_dive_recommendations(repo_dive_path: Path) -> list[Recommendation]:
+    if not repo_dive_path.exists():
+        return []
+    try:
+        payload = json.loads(repo_dive_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return [
+            Recommendation(
+                kind="repo-dive-ingestion",
+                priority="medium",
+                title="Repair malformed repo-dive report",
+                evidence=f"{repo_dive_path} exists but is not valid JSON.",
+                proposal="Rerun python3 scripts/repo_dive.py so toolset review can consume history-backed evidence.",
+                safety="report-only",
+            )
+        ]
+
+    recommendations: list[Recommendation] = []
+    for mode in payload.get("failure_modes", []):
+        status = mode.get("status")
+        if status not in {"fail", "watch"}:
+            continue
+        priority = str(mode.get("severity", "medium"))
+        recommendations.append(
+            Recommendation(
+                kind="repo-dive-detector",
+                priority=priority,
+                title=f"Follow up repo-dive detector: {mode.get('detector_id', 'unknown')}",
+                evidence=str(mode.get("evidence", "repo-dive detector emitted no evidence")),
+                proposal=str(
+                    mode.get(
+                        "prevention",
+                        "Inspect .build/repo_dive_report.json and add a focused guard if needed.",
+                    )
+                ),
+                safety="suggest-only",
+            )
+        )
+
+    existing_titles = {rec.title for rec in recommendations}
+    for rec in payload.get("recommendations", []):
+        title = str(rec.get("title", "Repo-dive recommendation"))
+        if title in existing_titles:
+            continue
+        kind = str(rec.get("kind", "repo-dive"))
+        if kind not in {"skill", "agent", "script", "test", "docs", "future-file-plan-row"}:
+            continue
+        recommendations.append(
+            Recommendation(
+                kind=f"repo-dive-{kind}",
+                priority=str(rec.get("priority", "medium")),
+                title=title,
+                evidence=str(rec.get("evidence", "history-backed repo-dive recommendation")),
+                proposal=f"Consider {rec.get('suggested_artifact', 'a focused harness addition')}.",
+                safety="suggest-only",
+            )
+        )
+        existing_titles.add(title)
+
+    return recommendations
 
 
 def render_markdown(recommendations: list[Recommendation]) -> str:
@@ -186,6 +250,7 @@ def main() -> int:
     recommendations = collect_recommendations()
     payload = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "inputs": {"repo_dive_report": REPO_DIVE_REPORT_PATH.exists()},
         "recommendations": [asdict(rec) for rec in recommendations],
     }
     JSON_PATH.write_text(json.dumps(payload, indent=2))

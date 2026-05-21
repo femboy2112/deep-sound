@@ -75,11 +75,12 @@ Self-review is suggest-only. It must not auto-edit the harness.
 The current mechanism is:
 
 1. Run `python3 scripts/toolset_review.py`.
-2. The script inspects repo state, verify output, repair attempts, and harness coverage.
-3. It writes:
+2. Optionally run `python3 scripts/repo_dive.py --strict` first when history-backed evidence is useful.
+3. The script inspects repo state, verify output, repair attempts, repo-dive output when present, and harness coverage.
+4. It writes:
    - `.build/toolset_review.json`
    - `.build/toolset_review.md`
-4. Hooks may surface those artifacts, but must not apply their recommendations automatically.
+5. Hooks may surface those artifacts, but must not apply their recommendations automatically.
 
 Recommendation classes:
 
@@ -89,6 +90,7 @@ Recommendation classes:
 - repeated repair pattern
 - verification blind spot
 - doc drift
+- history-backed detector watch
 
 Every recommendation should include evidence, a concrete proposed addition, and a safety level.
 
@@ -108,6 +110,14 @@ Current Codex hook intent:
 - `session_start_status.sh`: run `scripts/session_start.py` and surface repair state.
 - `stop_self_review.sh`: run the suggest-only toolset review and surface any recommendations.
 
+## History Dive Contract
+
+`scripts/repo_dive.py` is a read-only audit command for git/build/test history. It writes `.build/repo_dive_report.json` and `.build/repo_dive_report.md`, degrades cleanly with `--no-git`, and fails `--strict` only for high-severity current detector failures.
+
+The durable curated summary is [docs/build/REPO_DIVE.md](docs/build/REPO_DIVE.md). Generated `.build/` reports are evidence, not tracked source-of-truth docs.
+
+Repo-dive detectors are registry-based. New checks should be added as detectors instead of one-off report branches.
+
 ## Subagent Policy
 
 Subagents are allowed and encouraged when their scope is bounded.
@@ -115,6 +125,7 @@ Subagents are allowed and encouraged when their scope is bounded.
 Rules:
 
 - Use read-only exploration roles for repo audit, MIR review, and verification interpretation.
+- Use `history-auditor` and `dependency-gate-auditor` as read-only roles when history or optional-gate evidence matters.
 - Use coding roles only with explicit file ownership and no overlap.
 - Prefer subagents for sidecar work, not for the immediate blocking task.
 - Every delegated coding task must return changed files and validation results.

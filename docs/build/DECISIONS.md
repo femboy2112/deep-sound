@@ -132,3 +132,17 @@ Phase 13 promotes playback from inspection-only DTOs to a guarded beta transport
 The `[playback]` extra adds `sounddevice` only. It must not be folded into default, `[ui]`, `[demucs]`, or required verification dependencies. Missing `sounddevice` or an output-capable device is skipped evidence under `--playback-smoke-policy auto` and a failure only under `required`.
 
 Playback smoke uses generated audio, starts nonblocking playback, stops immediately, and hash-checks the generated fixture. Original imported audio files remain read-only, and device/decode errors are surfaced as `PlaybackState(status=FAILED, error_message=...)` rather than UI exceptions.
+
+## 2026-05-21 — Harness-first history dive override
+
+The FILE_PLAN is exhausted at `ACTIVE_PHASE: 13`, so this pass uses the harness priority override for read-only repo-history tooling rather than product behavior. The goal is to turn real historical failures into durable detectors, review roles, skills, and suggest-only recommendations.
+
+The override is limited to:
+
+- `scripts/repo_dive.py`,
+- tests for repo-dive and toolset-review ingestion,
+- `.codex/` skills and read-only roles,
+- mirrored `.claude/` read-only roles,
+- harness/build documentation.
+
+The generated `.build/repo_dive_report.{json,md}` files are evidence. `docs/build/REPO_DIVE.md` is the tracked curated summary. `scripts/toolset_review.py` may consume the generated JSON report but remains suggest-only and must not edit tracked files.
