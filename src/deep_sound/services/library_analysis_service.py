@@ -19,6 +19,7 @@ class AnalysisProfile(StrEnum):
     SEARCHABLE = "searchable"
     SOURCE_AWARE = "source_aware"
     SOURCE_AWARE_REAL = "source_aware_real"
+    QUALITY = "quality"
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,10 +124,15 @@ class LibraryAnalysisService:
             AnalysisProfile.SEARCHABLE,
             AnalysisProfile.SOURCE_AWARE,
             AnalysisProfile.SOURCE_AWARE_REAL,
+            AnalysisProfile.QUALITY,
         }:
             views.append(self._analysis.analyze_production_texture(track))
             views.append(self._analysis.structure_feature_view(track))
-        if profile in {AnalysisProfile.SOURCE_AWARE, AnalysisProfile.SOURCE_AWARE_REAL}:
+        if profile in {
+            AnalysisProfile.SOURCE_AWARE,
+            AnalysisProfile.SOURCE_AWARE_REAL,
+            AnalysisProfile.QUALITY,
+        }:
             views.extend(self._analyze_source_aware(track, profile=profile))
         return views
 

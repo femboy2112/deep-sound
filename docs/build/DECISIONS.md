@@ -146,3 +146,13 @@ The override is limited to:
 - harness/build documentation.
 
 The generated `.build/repo_dive_report.{json,md}` files are evidence. `docs/build/REPO_DIVE.md` is the tracked curated summary. `scripts/toolset_review.py` may consume the generated JSON report but remains suggest-only and must not edit tracked files.
+
+## 2026-05-21 — Phase 14 MIR quality boundary
+
+Phase 14 improves deterministic MIR quality without changing the default dependency contract. The required quality gate is `python3 scripts/mir_quality_eval.py --fixture-mode generated --strict`, which writes `.build/mir_quality_report.json` and `.build/mir_quality_report.md` from generated fixtures only.
+
+The `quality` analysis profile reuses existing services, SQLite storage, and fake-provider source-aware routing. It must not require Demucs, PySide, playback, FAISS, GPU packages, learned models, cloud services, or the optional `[mir]` extra during default verification.
+
+Analyzer upgrades remain deterministic proxies: chroma-change chord segmentation, smoothed melody contour, richer bass/drum/source-timbre stats, and quality search/explanation regressions. All inferred source, chord, event, and analyzer labels remain confidence-bounded and caveated. Similarity scores remain similarity evidence, not analyzer confidence.
+
+Real separation quality, broad human-curated corpus evaluation, learned MIR models, GPU acceleration, packaging, and commercial release work remain future work unless a later row explicitly scopes them.

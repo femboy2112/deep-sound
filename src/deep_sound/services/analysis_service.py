@@ -18,7 +18,15 @@ from deep_sound.infra.analyzers.melody_contour import summarize_melody_contour
 from deep_sound.infra.analyzers.mfcc_librosa import summarize_mfcc
 from deep_sound.infra.analyzers.other_stem import summarize_other_stem
 from deep_sound.infra.analyzers.production_texture import summarize_production_texture
-from deep_sound.infra.analyzers.source_chords import infer_source_chord_events
+from deep_sound.infra.analyzers.source_chords import (
+    ANALYZER_NAME as SOURCE_CHORD_ANALYZER_NAME,
+)
+from deep_sound.infra.analyzers.source_chords import (
+    ANALYZER_VERSION as SOURCE_CHORD_ANALYZER_VERSION,
+)
+from deep_sound.infra.analyzers.source_chords import (
+    infer_source_chord_events,
+)
 from deep_sound.infra.analyzers.tempo_librosa import DEFAULT_SAMPLE_RATE, estimate_tempo
 from deep_sound.infra.storage.sqlite_store import SectionRecord, SqliteStore
 from deep_sound.services.source_service import SourceService
@@ -125,6 +133,8 @@ class AnalysisService:
                         "groove_regularity": drum_summary.groove_regularity,
                         "onset_density": drum_summary.onset_density,
                         "spectral_centroid": drum_summary.spectral_centroid,
+                        "transient_strength": drum_summary.transient_strength,
+                        "high_frequency_ratio": drum_summary.high_frequency_ratio,
                     },
                     confidence=drum_summary.confidence,
                 )
@@ -144,6 +154,8 @@ class AnalysisService:
                         "low_energy_ratio": bass_summary.low_energy_ratio,
                         "pitch_motion": bass_summary.pitch_motion,
                         "root_stability": bass_summary.root_stability,
+                        "pitch_variety": bass_summary.pitch_variety,
+                        "median_register": bass_summary.median_register,
                     },
                     confidence=bass_summary.confidence,
                 )
@@ -279,16 +291,21 @@ class AnalysisService:
         if stem.artifact_path is None:
             raise ValueError(f"Source {source.id} parent stem has no artifact_path")
         summary = summarize_mfcc(stem.artifact_path, sample_rate=self._sample_rate)
+        texture = summarize_production_texture(stem.artifact_path, sample_rate=self._sample_rate)
+        stats = _vector_stats("timbre", summary.mfcc)
+        stats.update({f"texture_{key}": value for key, value in texture.stats.items()})
         view = FeatureView(
             id=f"{source.id}:timbre.embedding",
             owner_type=OwnerType.SOURCE,
             owner_id=source.id,
             feature_type=FeatureType.TIMBRE_EMBEDDING,
-            algorithm=f"{summary.analyzer}_source_proxy",
-            algorithm_version=summary.analyzer_version,
+            algorithm=f"{summary.analyzer}_source_quality_proxy",
+            algorithm_version=f"{summary.analyzer_version}+quality.1",
             params_hash=f"sample_rate={self._sample_rate};n_mfcc={summary.n_mfcc}",
-            stats=_vector_stats("timbre", summary.mfcc),
-            confidence=Confidence(min(summary.confidence.value, source.confidence.value)),
+            stats=stats,
+            confidence=Confidence(
+                min(summary.confidence.value, texture.confidence.value, source.confidence.value)
+            ),
         )
         self._store.replace_feature_view_for_owner(view)
         return view
@@ -326,8 +343,8 @@ class AnalysisService:
             owner_type=OwnerType.SOURCE,
             owner_id=source.id,
             feature_type=FeatureType.HARMONY_CHORD_SEQUENCE,
-            algorithm="source_chords_chroma_template",
-            algorithm_version="0.1.0",
+            algorithm=SOURCE_CHORD_ANALYZER_NAME,
+            algorithm_version=SOURCE_CHORD_ANALYZER_VERSION,
             params_hash=f"sample_rate={self._sample_rate}",
             symbolic_json=json.dumps({"tokens": sequence_tokens}, sort_keys=True),
             stats=_token_histogram(sequence_tokens),
@@ -338,8 +355,8 @@ class AnalysisService:
             owner_type=OwnerType.SOURCE,
             owner_id=source.id,
             feature_type=FeatureType.HARMONY_CHORD_CHANGE,
-            algorithm="source_chords_chroma_template",
-            algorithm_version="0.1.0",
+            algorithm=SOURCE_CHORD_ANALYZER_NAME,
+            algorithm_version=SOURCE_CHORD_ANALYZER_VERSION,
             params_hash=f"sample_rate={self._sample_rate}",
             symbolic_json=json.dumps({"root_motion": root_motion}, sort_keys=True),
             stats={f"interval_{index:02d}": float(root_motion.count(index)) for index in range(12)},

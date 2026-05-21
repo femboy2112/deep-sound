@@ -12,7 +12,7 @@ Repo-control-plane docs live in:
 
 ## Status
 
-This repository is in **Phase 13 real playback transport beta**. Phase 13 keeps default verification dependency-light while adding opt-in local audio playback through the `[playback]` extra. Real device output is never required by `make verify`; PySide, Demucs, playback devices, FAISS, and heavier MIR extras remain explicit live QA gates.
+This repository is in **Phase 14 MIR quality baseline and deterministic analyzer upgrade**. Phase 14 keeps default verification dependency-light while adding generated-fixture quality evidence, the `quality` analysis profile, and upgraded deterministic chord, melody, bass, drum, source-timbre, and explanation paths. Real device output is never required by `make verify`; PySide, Demucs, playback devices, FAISS, learned models, cloud services, and heavier MIR extras remain explicit live QA gates.
 
 ## Quickstart
 
@@ -24,6 +24,9 @@ bash scripts/bootstrap.sh        # installs uv if missing, runs uv sync --extra 
 uv run deep-sound analyze-library --library-db /tmp/deep-sound.sqlite --import-path path/to/audio --profile searchable
 uv run deep-sound index-library --library-db /tmp/deep-sound.sqlite --profile searchable
 
+# Run the dependency-light MIR quality profile
+uv run deep-sound analyze-library --library-db /tmp/deep-sound-quality.sqlite --import-path path/to/audio --profile quality
+
 # Optional CPU real-source smoke when Demucs is installed intentionally
 uv run deep-sound analyze-library --library-db /tmp/deep-sound-real.sqlite --import-path path/to/audio --profile source_aware_real
 
@@ -32,6 +35,9 @@ uv sync --extra playback
 
 # Run generated-fixture live QA evidence
 python3 scripts/live_qa.py --fixture-mode generated
+
+# Run generated-fixture MIR quality evidence
+python3 scripts/mir_quality_eval.py --fixture-mode generated --strict
 
 # Run installed real-smoke gates automatically, skipping only unavailable extras
 QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto

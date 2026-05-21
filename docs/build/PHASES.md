@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 13
+**ACTIVE_PHASE:** 14
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -249,3 +249,35 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - `DEEP_SOUND_RUN_PLAYBACK_SMOKE=1 uv run pytest tests/test_phase13_live_playback_smoke.py -vv` is available as an explicit real-device smoke.
 
 **FILE_PLAN ids:** `P13-001` .. `P13-0NN`.
+
+---
+
+## Phase 14 — MIR Quality Baseline And Deterministic Analyzer Upgrade
+
+**Goal:** Improve measurable MIR quality for deterministic chord, melody, bass,
+drum, source-timbre, and explanation paths without changing the dependency-light
+default verification gate.
+
+**Required capabilities:**
+- Add a generated-fixture MIR quality harness that writes
+  `.build/mir_quality_report.json` and `.build/mir_quality_report.md`.
+- Add an explicit `quality` analysis profile that reuses current storage,
+  fake-provider source routing, and deterministic analyzers.
+- Replace fixed-only source chord segmentation with chroma-change-aware segments
+  and confidence-bounded calibration.
+- Improve melody contour proxies with smoothing, voicing/activity metrics, and
+  explicit low-confidence behavior.
+- Add richer normalized bass, drum, and source-timbre stats while preserving
+  feature shape compatibility and deterministic output.
+- Preserve retrieval versus reranking separation, source-type compatibility
+  filters, stale-index caveats, and probabilistic explanation language.
+
+**Exit criteria:**
+- `python3 scripts/mir_quality_eval.py --fixture-mode generated --strict` records
+  passing generated quality gates without Demucs, PySide, FAISS, playback,
+  learned models, GPU, or cloud services.
+- `python3 scripts/verify.py` remains green under the default dependency-light
+  environment.
+- Phase closeout records status, quality harness, and toolset-review evidence.
+
+**FILE_PLAN ids:** `P14-001` .. `P14-0NN`.

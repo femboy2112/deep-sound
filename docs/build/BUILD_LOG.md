@@ -4,6 +4,34 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-21 — Phase 14 MIR quality baseline and analyzer upgrade
+
+- **Agent:** Codex
+- **Scope:** Open Phase 14, add dependency-light MIR quality evidence, and improve deterministic analyzer/search quality.
+- **Rows touched:** P14-001 .. P14-010.
+- **Changes:**
+  - Promoted `ACTIVE_PHASE` to 14 and documented the MIR quality boundary.
+  - Added `scripts/mir_quality_eval.py`, a generated-fixture quality harness that writes `.build/mir_quality_report.json` and `.build/mir_quality_report.md`.
+  - Added the `quality` analysis profile over existing services, SQLite storage, and fake-provider source-aware routing.
+  - Upgraded deterministic source chord segmentation/confidence, melody contour smoothing/voicing metrics, bass/drum quality stats, and source-timbre quality stats.
+  - Added a `quality` search mode and focused confidence-language regression coverage without changing retrieval/rerank separation or source compatibility filters.
+  - Refreshed README, manual QA, repo audit, decisions, and build docs for Phase 14.
+- **Verification:**
+  - `uv run pytest tests/test_mir_quality_eval.py tests/test_phase14_quality_profile.py tests/test_phase14_analyzer_quality.py tests/test_phase14_similarity_quality.py tests/test_phase14_confidence_language.py`
+  - `uv run ruff check ...`
+  - `uv run mypy src/deep_sound scripts/mir_quality_eval.py`
+  - `python3 scripts/mir_quality_eval.py --fixture-mode generated --strict`
+  - `python3 scripts/repo_dive.py --strict`
+  - `python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy off`
+  - `python3 scripts/status.py`
+  - `python3 scripts/toolset_review.py`
+  - `python3 scripts/verify.py`
+- **Notes:**
+  - Default verification remains free of required PySide, Demucs, playback, FAISS, GPU packages, learned models, cloud services, or the optional `[mir]` extra.
+  - Generated quality reports are evidence under `.build/`, not tracked source.
+
+---
+
 ## 2026-05-21 — Harness history dive tooling
 
 - **Agent:** Codex

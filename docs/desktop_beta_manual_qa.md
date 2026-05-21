@@ -1,12 +1,12 @@
 # Desktop Beta Manual QA
 
-Use this checklist for Phase 13 local desktop beta QA. Default automated verification stays dependency-light; installed PySide, CPU Demucs, and playback smoke are expected closeout evidence when the local extras and devices are available. Missing real-smoke dependencies are skips under `auto` policy and failures under `required` policy.
+Use this checklist for Phase 14 local desktop and MIR-quality beta QA. Default automated verification stays dependency-light; generated MIR quality evidence is required for Phase 14, while installed PySide, CPU Demucs, and playback smoke remain optional closeout evidence when the local extras and devices are available. Missing real-smoke dependencies are skips under `auto` policy and failures under `required` policy.
 
 ## Setup
 
 1. Prepare a tiny local audio folder with at least two valid audio files and one intentionally broken `.wav` text file.
 2. Run `make bootstrap` if dependencies are missing.
-3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 13`.
+3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 14`.
 4. Use a fresh library database, for example `/tmp/deep-sound-desktop-beta.sqlite`, and an app data directory under `/tmp/deep-sound-desktop-beta-data`.
 
 ## Live QA Harness
@@ -27,7 +27,7 @@ Use this checklist for Phase 13 local desktop beta QA. Default automated verific
    QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto
    ```
 
-7. Before closing Phase 13 on a prepared machine, run required real smoke for the optional dependencies available on that machine:
+7. Before closing Phase 14 on a prepared machine, run required real smoke for the optional dependencies available on that machine:
 
    ```bash
    QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py \
@@ -39,16 +39,31 @@ Use this checklist for Phase 13 local desktop beta QA. Default automated verific
      --playback-smoke-policy required
    ```
 
+## MIR Quality Harness
+
+1. Run the dependency-light generated quality gate:
+
+   ```bash
+   python3 scripts/mir_quality_eval.py --fixture-mode generated --strict
+   ```
+
+2. Confirm `.build/mir_quality_report.json` and `.build/mir_quality_report.md` exist.
+3. Confirm all quality gates are `passed`: tempo stability, chroma/chord consistency, melody contour shape, drum groove proxy, bass motion proxy, quality-profile source routing, and confidence bounds.
+4. Confirm the generated fixtures and derived app artifacts stay under `.build/` and the configured app data directory.
+5. Confirm the `quality` profile does not require Demucs, PySide, playback, FAISS, GPU packages, learned models, cloud services, or the optional `[mir]` extra.
+6. Treat the report as deterministic fixture evidence, not broad-corpus or real-separation quality proof.
+
 ## Service Workflow
 
 1. Import the folder through the desktop controller or CLI and confirm valid files import while the broken file records a failed job.
 2. Analyze the library with profile `searchable`; confirm the aggregate job completes and per-track analysis state updates.
-3. Re-run the same analysis and confirm no duplicate feature errors.
-4. Build the `searchable` profile indexes and confirm index status DTOs show available backends or explicit scan caveats.
-5. Run a track query and confirm result cards expose backend, dimension scores, stale-index warnings, caveats, and feedback action metadata.
-6. Build a waveform cache for a selected track and confirm a JSON artifact is written under app data.
-7. Select and persist a clip window; confirm the clip DTO has a `clip` query owner type and stable time bounds.
-8. Submit relevant and irrelevant feedback on a result and confirm follow-up result DTOs expose feedback adjustment metadata.
+3. Analyze the same library with profile `quality`; confirm the aggregate job completes and adds deterministic full-mix, broad-stem, and source-owned quality feature rows.
+4. Re-run the same analysis and confirm no duplicate feature errors.
+5. Build the `searchable` profile indexes and confirm index status DTOs show available backends or explicit scan caveats.
+6. Run a track query and confirm result cards expose backend, dimension scores, stale-index warnings, caveats, and feedback action metadata.
+7. Build a waveform cache for a selected track and confirm a JSON artifact is written under app data.
+8. Select and persist a clip window; confirm the clip DTO has a `clip` query owner type and stable time bounds.
+9. Submit relevant and irrelevant feedback on a result and confirm follow-up result DTOs expose feedback adjustment metadata.
 
 ## Interactive PySide Smoke
 
@@ -130,11 +145,12 @@ Only run this section after intentionally installing the `[demucs]` extra or oth
 - Playback output is beta-only and depends on host audio-device availability.
 - Default verification does not exercise a real installed PySide session unless `[ui]` is installed locally.
 - Default `source_aware` QA still uses fake-provider source paths. Real separation QA uses only the explicit `source_aware_real` path.
+- Generated MIR quality evidence does not prove broad-corpus or production separation quality.
 - Optional live gate skips are expected when dependencies are absent under `auto`, but requested or required gate failures must remain visible in `.build/live_qa_report.*`.
 
 ## Non-Goals
 
 - Do not install Demucs, playback, FAISS, or heavy MIR extras for default desktop beta QA.
-- Do not add a CUDA/GPU Demucs path in Phase 13.
+- Do not add a CUDA/GPU Demucs path in Phase 14.
 - Do not modify original audio files.
 - Do not treat fake-provider source-aware output as production separation quality.

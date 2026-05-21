@@ -27,6 +27,7 @@ class SearchMode(StrEnum):
     VOCAL_TIMBRE = "vocal_timbre"
     SOURCE_ROLE = "source_role"
     ADVANCED = "advanced"
+    QUALITY = "quality"
 
 
 MODE_FEATURE_TYPES: dict[SearchMode, tuple[FeatureType, ...]] = {
@@ -55,6 +56,13 @@ MODE_FEATURE_TYPES: dict[SearchMode, tuple[FeatureType, ...]] = {
         FeatureType.MELODY_CONTOUR,
         FeatureType.TIMBRE_EMBEDDING,
         FeatureType.HARMONY_CHORD_SEQUENCE,
+    ),
+    SearchMode.QUALITY: (
+        FeatureType.RHYTHM_GLOBAL,
+        FeatureType.HARMONY_CHROMA,
+        FeatureType.TIMBRE_MFCC_STATS,
+        FeatureType.PRODUCTION_TEXTURE,
+        FeatureType.STRUCTURE_SECTION_SEQUENCE,
     ),
 }
 
