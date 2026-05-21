@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -103,6 +104,28 @@ def _write_click_track(path: Path, *, bpm: float) -> None:
         samples[start:end] += envelope[: end - start]
         t += period_sec
     sf.write(path, samples, sample_rate)
+
+
+def _write_demucs_smoke_fixture(path: Path) -> None:
+    sample_rate = 22_050
+    duration_sec = 2.0
+    t = np.linspace(0.0, duration_sec, int(sample_rate * duration_sec), endpoint=False)
+    bass = 0.22 * np.sin(2.0 * np.pi * 82.41 * t)
+    chord = 0.12 * (
+        np.sin(2.0 * np.pi * 261.63 * t)
+        + np.sin(2.0 * np.pi * 329.63 * t)
+        + np.sin(2.0 * np.pi * 392.00 * t)
+    )
+    click = np.zeros_like(t)
+    click_len = int(0.015 * sample_rate)
+    envelope = np.exp(-np.linspace(0, 6, click_len)).astype(np.float64)
+    for beat in (0.0, 0.5, 1.0, 1.5):
+        start = int(beat * sample_rate)
+        end = min(start + click_len, click.shape[0])
+        click[start:end] += 0.35 * envelope[: end - start]
+    audio = np.clip(bass + chord + click, -0.9, 0.9).astype(np.float32)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(path, audio, sample_rate)
 
 
 def _prepare_generated_fixtures(run_dir: Path) -> tuple[Path, list[Path], Path]:
@@ -336,7 +359,7 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
     return True
 
 
-def _optional_pyside_gate(*, run: bool, run_dir: Path) -> GateResult:
+def _optional_pyside_gate(*, run: bool, required: bool, run_dir: Path) -> GateResult:
     if not run:
         return GateResult(
             name="pyside_smoke",
@@ -345,13 +368,17 @@ def _optional_pyside_gate(*, run: bool, run_dir: Path) -> GateResult:
             summary="PySide smoke was not requested.",
         )
     if find_spec("PySide6") is None:
+        status = "failed" if required else "skipped_optional"
         return GateResult(
             name="pyside_smoke",
-            status="skipped_optional",
+            status=status,
             optional=True,
-            summary="PySide smoke was requested but PySide6 is not installed.",
+            summary="PySide smoke is required but PySide6 is not installed."
+            if required
+            else "PySide smoke was requested but PySide6 is not installed.",
         )
     try:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from deep_sound.ui.desktop_app import (
             create_desktop_app_window,
             desktop_app_config,
@@ -384,26 +411,41 @@ def _optional_pyside_gate(*, run: bool, run_dir: Path) -> GateResult:
     )
 
 
-def _optional_demucs_gate(args: argparse.Namespace, run_dir: Path) -> GateResult:
-    if not args.run_demucs_smoke:
+def _optional_demucs_gate(
+    args: argparse.Namespace,
+    *,
+    run: bool,
+    required: bool,
+    run_dir: Path,
+) -> GateResult:
+    if not run:
         return GateResult(
             name="real_source_smoke",
             status="skipped_optional",
             optional=True,
             summary="Real Demucs source-aware smoke was not requested.",
         )
-    if args.demucs_audio is None:
+    executable_name = str(args.demucs_executable or "demucs")
+    executable = shutil.which(executable_name)
+    if executable is None:
+        status = "failed" if required else "skipped_optional"
         return GateResult(
             name="real_source_smoke",
-            status="skipped_optional",
+            status=status,
             optional=True,
-            summary="Real Demucs source-aware smoke was requested without --demucs-audio.",
+            summary="Real Demucs source-aware smoke is required but Demucs is not installed."
+            if required
+            else "Real Demucs source-aware smoke was requested but Demucs is not installed.",
         )
-    audio_path = args.demucs_audio.expanduser()
+    audio_path = args.demucs_audio.expanduser() if args.demucs_audio is not None else None
+    if audio_path is None:
+        audio_path = run_dir / "fixtures" / "generated_demucs_smoke.wav"
+        _write_demucs_smoke_fixture(audio_path)
     if not audio_path.is_file():
+        status = "failed" if required else "skipped_optional"
         return GateResult(
             name="real_source_smoke",
-            status="skipped_optional",
+            status=status,
             optional=True,
             summary=f"Real Demucs source-aware smoke fixture is not a file: {audio_path}",
         )
@@ -411,14 +453,16 @@ def _optional_demucs_gate(args: argparse.Namespace, run_dir: Path) -> GateResult
     env = os.environ.copy()
     env["DEEP_SOUND_RUN_DEMUCS_SMOKE"] = "1"
     env["DEEP_SOUND_DEMUCS_SMOKE_AUDIO"] = str(audio_path)
-    if args.demucs_executable is not None:
-        env["DEEP_SOUND_DEMUCS_EXECUTABLE"] = str(args.demucs_executable)
+    env["DEEP_SOUND_DEMUCS_EXECUTABLE"] = executable
+    env.setdefault("UV_CACHE_DIR", "/tmp/uv-cache")
+    env.setdefault("TORCH_HOME", str(run_dir / "torch_cache"))
+    env.setdefault("XDG_CACHE_HOME", str(run_dir / "xdg_cache"))
     argv = [
         "uv",
         "run",
         "pytest",
-        "tests/test_phase10_optional_demucs_smoke.py",
-        "-q",
+        "tests/test_phase11_live_demucs_workflow.py",
+        "-vv",
     ]
     proc = subprocess.run(
         argv,
@@ -431,6 +475,8 @@ def _optional_demucs_gate(args: argparse.Namespace, run_dir: Path) -> GateResult
     status = "passed" if proc.returncode == 0 else "failed"
     if proc.returncode == 5 or "skipped" in proc.stdout.lower():
         status = "skipped_optional"
+    if required and status == "skipped_optional":
+        status = "failed"
     return GateResult(
         name="real_source_smoke",
         status=status,
@@ -508,6 +554,15 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Fixture source for required live QA gates.",
     )
     parser.add_argument(
+        "--real-smoke-policy",
+        choices=("auto", "required", "off"),
+        default="auto",
+        help=(
+            "Real smoke policy: auto runs installed real-smoke gates, required fails when "
+            "PySide or Demucs is missing, off records skips."
+        ),
+    )
+    parser.add_argument(
         "--run-dir",
         type=Path,
         default=None,
@@ -564,9 +619,29 @@ def main(argv: list[str] | None = None) -> int:
             )
         ]
 
+    required_real_smoke = args.real_smoke_policy == "required"
+    if args.real_smoke_policy == "off":
+        run_pyside_smoke = False
+        run_demucs_smoke = False
+    elif required_real_smoke:
+        run_pyside_smoke = True
+        run_demucs_smoke = True
+    else:
+        run_pyside_smoke = args.run_pyside_smoke or find_spec("PySide6") is not None
+        demucs_executable = str(args.demucs_executable or "demucs")
+        run_demucs_smoke = args.run_demucs_smoke or shutil.which(demucs_executable) is not None
     optional = [
-        _optional_pyside_gate(run=args.run_pyside_smoke, run_dir=run_dir),
-        _optional_demucs_gate(args, run_dir),
+        _optional_pyside_gate(
+            run=run_pyside_smoke,
+            required=required_real_smoke,
+            run_dir=run_dir,
+        ),
+        _optional_demucs_gate(
+            args,
+            run=run_demucs_smoke,
+            required=required_real_smoke,
+            run_dir=run_dir,
+        ),
     ]
     overall = _report_overall(required, optional)
     report = LiveQAReport(

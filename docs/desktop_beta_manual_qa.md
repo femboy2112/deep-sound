@@ -1,12 +1,12 @@
 # Desktop Beta Manual QA
 
-Use this checklist for Phase 11 local desktop beta QA. Default automated verification stays dependency-light; live PySide, real-Demucs, and local audio-device checks are explicit opt-in gates and must be logged separately from required generated-fixture evidence.
+Use this checklist for Phase 12 local desktop beta QA. Default automated verification stays dependency-light; installed PySide and CPU Demucs smoke are expected closeout evidence when the local extras are available. Missing real-smoke dependencies are skips under `auto` policy and failures under `required` policy.
 
 ## Setup
 
 1. Prepare a tiny local audio folder with at least two valid audio files and one intentionally broken `.wav` text file.
 2. Run `make bootstrap` if dependencies are missing.
-3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 11`.
+3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 12`.
 4. Use a fresh library database, for example `/tmp/deep-sound-desktop-beta.sqlite`, and an app data directory under `/tmp/deep-sound-desktop-beta-data`.
 
 ## Live QA Harness
@@ -21,6 +21,21 @@ Use this checklist for Phase 11 local desktop beta QA. Default automated verific
 3. Confirm required gates are `passed`: import, analysis, index, search, waveform, clip, feedback, and artifact safety.
 4. Confirm optional gates are listed separately as `skipped_optional` unless intentionally requested.
 5. If an optional gate is requested and fails, keep the failure in the report with the command, fixture, and artifact context needed to reproduce it. Do not rewrite the failure as a skip.
+6. For closeout evidence on a machine with optional extras installed, run:
+
+   ```bash
+   QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto
+   ```
+
+7. Before closing Phase 12 on a prepared machine, run required real smoke:
+
+   ```bash
+   QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py \
+     --fixture-mode generated \
+     --run-pyside-smoke \
+     --run-demucs-smoke \
+     --real-smoke-policy required
+   ```
 
 ## Service Workflow
 
@@ -35,7 +50,7 @@ Use this checklist for Phase 11 local desktop beta QA. Default automated verific
 
 ## Interactive PySide Smoke
 
-Only run this section after installing the `[ui]` extra. For harness evidence, request it explicitly with `python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke`.
+Only run this section after installing the `[ui]` extra. For harness evidence, request it explicitly with `QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke --real-smoke-policy required`.
 
 1. Create the desktop app window with a fresh database and confirm the main-window import, analyze, reindex, refresh, and selected-track search buttons route through the injected controller.
 2. Select a track row, build a waveform cache, and confirm the track-detail panel shows selected-track state plus waveform or an explicit cache-unavailable message.
@@ -47,11 +62,22 @@ Only run this section after installing the `[ui]` extra. For harness evidence, r
 
 ## Optional Real-Source Smoke
 
-Only run this section after intentionally installing the `[demucs]` extra or otherwise making the `demucs` executable available.
+Only run this section after intentionally installing the `[demucs]` extra or otherwise making the `demucs` executable available. The default project path is CPU-only Torch/Torchaudio through the `pytorch-cpu` uv index; do not add CUDA/NVIDIA/Triton packages for Phase 12.
 
-1. Prepare one tiny local audio fixture and confirm it is safe to copy into temporary app data.
-2. Run `DEEP_SOUND_RUN_DEMUCS_SMOKE=1 DEEP_SOUND_DEMUCS_SMOKE_AUDIO=/path/to/tiny.wav uv run pytest tests/test_phase10_optional_demucs_smoke.py`.
-3. Run the CLI opt-in path:
+1. Install or restore the optional environment:
+
+   ```bash
+   uv sync --extra ui --extra demucs
+   ```
+
+2. Run the Phase 11 real workflow smoke. The test generates a tiny deterministic fixture when `DEEP_SOUND_DEMUCS_SMOKE_AUDIO` is not supplied:
+
+   ```bash
+   DEEP_SOUND_RUN_DEMUCS_SMOKE=1 uv run pytest tests/test_phase11_live_demucs_workflow.py -vv
+   ```
+
+3. Confirm `uv.lock` contains no `nvidia-*`, CUDA, or `triton` package names for the default CPU Demucs path.
+4. Run the CLI opt-in path:
 
    ```bash
    uv run deep-sound analyze-library \
@@ -61,15 +87,15 @@ Only run this section after intentionally installing the `[demucs]` extra or oth
      --app-data-dir /tmp/deep-sound-real-source-data
    ```
 
-4. Confirm stems are written below `/tmp/deep-sound-real-source-data/stems/`, original audio bytes are unchanged, and persisted stem metadata reports `demucs` with model/version/params/input provenance.
-5. Run the same command with an intentionally missing `--demucs-executable` and confirm the CLI fails with a clear `source_aware_real` opt-in error.
-6. For harness evidence, request the optional gate explicitly:
+5. Confirm stems are written below `/tmp/deep-sound-real-source-data/stems/`, original audio bytes are unchanged, and persisted stem metadata reports `demucs` with model/version/params/input provenance.
+6. Run the same command with an intentionally missing `--demucs-executable` and confirm the CLI fails with a clear `source_aware_real` opt-in error.
+7. For harness evidence, request the optional gate explicitly. `scripts/live_qa.py` generates a Demucs smoke fixture when `--demucs-audio` is omitted:
 
    ```bash
-   python3 scripts/live_qa.py \
+   QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py \
      --fixture-mode generated \
      --run-demucs-smoke \
-     --demucs-audio /path/to/tiny.wav
+     --real-smoke-policy required
    ```
 
 ## Known Gaps
@@ -77,10 +103,11 @@ Only run this section after intentionally installing the `[demucs]` extra or oth
 - Playback transport controls are still UI placeholders.
 - Default verification does not exercise a real installed PySide session unless `[ui]` is installed locally.
 - Default `source_aware` QA still uses fake-provider source paths. Real separation QA uses only the explicit `source_aware_real` path.
-- Optional live gate skips are expected when dependencies or fixtures are absent, but requested gate failures must remain visible in `.build/live_qa_report.*`.
+- Optional live gate skips are expected when dependencies are absent under `auto`, but requested or required gate failures must remain visible in `.build/live_qa_report.*`.
 
 ## Non-Goals
 
 - Do not install Demucs, FAISS, or heavy MIR extras for default desktop beta QA.
+- Do not add a CUDA/GPU Demucs path in Phase 12.
 - Do not modify original audio files.
 - Do not treat fake-provider source-aware output as production separation quality.

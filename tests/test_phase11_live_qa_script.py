@@ -34,26 +34,35 @@ def test_live_qa_generated_fixture_report(tmp_path: Path) -> None:
         "artifact_safety",
     }
     assert all(gate["status"] == "passed" for gate in payload["required_gates"])
-    assert {gate["name"]: gate["status"] for gate in payload["optional_gates"]} == {
-        "pyside_smoke": "skipped_optional",
-        "real_source_smoke": "skipped_optional",
-    }
+    optional_statuses = {gate["name"]: gate["status"] for gate in payload["optional_gates"]}
+    assert optional_statuses["pyside_smoke"] in {"passed", "skipped_optional"}
+    assert optional_statuses["real_source_smoke"] in {"passed", "skipped_optional"}
     assert "## Optional Gates" in markdown_report.read_text(encoding="utf-8")
 
 
-def test_live_qa_requested_demucs_without_fixture_is_optional_skip(tmp_path: Path) -> None:
+def test_live_qa_requested_demucs_without_installed_executable_is_optional_skip(
+    tmp_path: Path,
+) -> None:
     live_qa = _load_live_qa_module()
     run_dir = tmp_path / "live-qa-run"
 
     exit_code = live_qa.main(
-        ["--fixture-mode", "generated", "--run-dir", str(run_dir), "--run-demucs-smoke"]
+        [
+            "--fixture-mode",
+            "generated",
+            "--run-dir",
+            str(run_dir),
+            "--run-demucs-smoke",
+            "--demucs-executable",
+            str(tmp_path / "missing-demucs"),
+        ]
     )
 
     assert exit_code == 0
     payload = json.loads(Path(live_qa.JSON_REPORT_PATH).read_text(encoding="utf-8"))
     optional = {gate["name"]: gate for gate in payload["optional_gates"]}
     assert optional["real_source_smoke"]["status"] == "skipped_optional"
-    assert "--demucs-audio" in optional["real_source_smoke"]["summary"]
+    assert "not installed" in optional["real_source_smoke"]["summary"]
 
 
 def _load_live_qa_module() -> ModuleType:

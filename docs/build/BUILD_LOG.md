@@ -4,6 +4,33 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 12 CPU-only real smoke stabilization
+
+- **Agent:** Codex
+- **Scope:** Open Phase 12, make Demucs installs CPU-only by default, and make live QA real-smoke policy explicit.
+- **Rows touched:** P12-001 .. P12-009.
+- **Changes:**
+  - Promoted `ACTIVE_PHASE` to 12 and documented the CPU real-smoke boundary in phase and decision docs.
+  - Added `torchaudio` to `[demucs]` and pinned `torch`/`torchaudio` to uv's explicit `pytorch-cpu` index.
+  - Refreshed `uv.lock`; CUDA/NVIDIA/Triton packages were removed from the default Demucs resolution.
+  - Added `scripts/live_qa.py --real-smoke-policy auto|required|off`, generated Demucs fixture support, offscreen PySide handling, and Phase 11 real-Demucs workflow routing.
+  - Added Phase 12 tests for live QA policy behavior and optional-extra CPU lockfile/config guards.
+  - Refreshed README, manual QA, repo audit, and decisions for CPU-only real-smoke closeout.
+- **Verification:**
+  - `env UV_CACHE_DIR=/tmp/uv-cache uv lock`
+  - `env UV_CACHE_DIR=/tmp/uv-cache uv sync --extra ui --extra demucs`
+  - `uv run pytest tests/test_phase11_live_qa_script.py tests/test_phase12_live_qa_policy.py tests/test_phase12_optional_extra_resolution.py tests/test_phase11_live_demucs_workflow.py -q`
+  - `uv run pytest tests/test_demucs_provider.py tests/test_phase10_demucs_provider_contract.py tests/test_phase11_live_qa_script.py tests/test_phase12_live_qa_policy.py tests/test_phase12_optional_extra_resolution.py -q`
+  - `env UV_CACHE_DIR=/tmp/uv-cache QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke --run-demucs-smoke --real-smoke-policy required`
+  - `env UV_CACHE_DIR=/tmp/uv-cache DEEP_SOUND_RUN_DEMUCS_SMOKE=1 uv run pytest tests/test_phase11_live_demucs_workflow.py -vv`
+  - `python3 scripts/verify.py`
+- **Notes:**
+  - Default verification remains dependency-light.
+  - Required real-smoke gates needed network/cache access to download Demucs model weights; once available, PySide and real Demucs smoke both passed.
+  - GPU/CUDA Demucs support is explicitly future work.
+
+---
+
 ## 2026-05-20 — Phase 11 live beta QA hardening
 
 - **Agent:** Codex

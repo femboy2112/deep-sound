@@ -114,3 +114,13 @@ The live QA harness must write `.build/live_qa_report.json` and `.build/live_qa_
 Playback work in this phase is limited to import-safe inspection seams and UI/controller action DTOs. It must not require PySide or a local audio output device during default tests, and it must never mutate original audio files.
 
 `python3 scripts/live_qa.py --fixture-mode generated` is the dependency-light live evidence command. It may create generated fixtures, a temporary library database, indexes, waveform caches, clip artifacts, and report files under `.build/`, but it must hash-check the generated original fixtures and keep workflow artifacts under the configured app data directory. PySide and real-Demucs live gates are opt-in flags and remain visible as separate optional outcomes.
+
+## 2026-05-20 — Phase 12 CPU-only real smoke boundary
+
+Phase 12 makes installed real-smoke gates routine without changing the default dependency-light verify contract. `python3 scripts/verify.py` remains free of required PySide, Demucs, FAISS, learned-model, cloud-service, audio-device, or GPU dependencies.
+
+The `[demucs]` extra is CPU-only by default. `torch` and `torchaudio` resolve through uv's explicit `pytorch-cpu` index, and `torchcodec` remains on normal package resolution unless testing proves CPU index pinning is needed. Lockfile results that include `nvidia-*`, CUDA helper packages, or `triton` are treated as a Phase 12 regression.
+
+`scripts/live_qa.py --real-smoke-policy auto` runs PySide smoke when PySide is installed and real Demucs smoke when the Demucs executable is installed. `--real-smoke-policy required` converts missing PySide or Demucs into failed gates, and `off` records real-smoke skips even if flags are supplied. Demucs smoke may use a generated fixture; no `/tmp/deep_sound_live_smoke.wav` fixture is required.
+
+GPU/CUDA Demucs support, broader corpus QA, and separation-quality evaluation remain future work.

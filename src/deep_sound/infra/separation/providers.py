@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
@@ -112,8 +113,11 @@ class DemucsProvider(SeparationProvider):
             str(demucs_root),
             str(input_path),
         ]
+        env = os.environ.copy()
+        env.setdefault("TORCH_HOME", str(output_dir / "_torch_cache"))
+        env.setdefault("XDG_CACHE_HOME", str(output_dir / "_cache"))
         try:
-            subprocess.run(command, check=True, capture_output=True, text=True)
+            subprocess.run(command, check=True, capture_output=True, text=True, env=env)
         except FileNotFoundError as exc:
             raise RuntimeError(
                 "source_aware_real requires the optional Demucs executable; "

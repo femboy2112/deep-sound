@@ -12,7 +12,7 @@ Repo-control-plane docs live in:
 
 ## Status
 
-This repository is in **Phase 11 live beta QA hardening**. Phase 10 kept the default fake-provider `source_aware` path while adding explicit `source_aware_real` routing for local Demucs smoke tests; Phase 11 adds repeatable live QA evidence without making optional dependencies part of the default gate.
+This repository is in **Phase 12 CPU-only real smoke stabilization**. Phase 12 keeps default verification dependency-light while making installed PySide and installed Demucs smoke tests routine. The `[demucs]` extra resolves Torch and Torchaudio from the CPU-only PyTorch index by default; CUDA/GPU Demucs remains future work.
 
 ## Quickstart
 
@@ -24,11 +24,14 @@ bash scripts/bootstrap.sh        # installs uv if missing, runs uv sync --extra 
 uv run deep-sound analyze-library --library-db /tmp/deep-sound.sqlite --import-path path/to/audio --profile searchable
 uv run deep-sound index-library --library-db /tmp/deep-sound.sqlite --profile searchable
 
-# Optional real-source smoke when Demucs is installed intentionally
+# Optional CPU real-source smoke when Demucs is installed intentionally
 uv run deep-sound analyze-library --library-db /tmp/deep-sound-real.sqlite --import-path path/to/audio --profile source_aware_real
 
 # Run generated-fixture live QA evidence
 python3 scripts/live_qa.py --fixture-mode generated
+
+# Run installed real-smoke gates automatically, skipping only unavailable extras
+QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto
 
 # Run quality gates
 make verify                       # ruff + mypy + pytest

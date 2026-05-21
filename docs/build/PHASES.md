@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 11
+**ACTIVE_PHASE:** 12
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -207,3 +207,25 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - Manual QA docs, repo audit, decisions, and build log describe the live beta evidence standard and known-failure logging expectations.
 
 **FILE_PLAN ids:** `P11-001` .. `P11-0NN`.
+
+---
+
+## Phase 12 — CPU-Only Real Smoke Stabilization
+
+**Goal:** Make real PySide and real Demucs smoke testing routine when local optional dependencies are available, without changing the dependency-light default verification gate.
+
+**Required capabilities:**
+- Resolve the `[demucs]` extra against CPU-only PyTorch and Torchaudio wheels by default.
+- Keep GPU/CUDA Demucs support out of scope for this phase and document it as future work.
+- Run PySide smoke automatically when PySide is installed, with offscreen Qt for local harness usage.
+- Run real Demucs smoke automatically when Demucs and its dependencies are installed, using a generated fixture when no local fixture is supplied.
+- Preserve required gate failures in `.build/live_qa_report.{json,md}`; missing dependencies are skips only under `auto` policy.
+- Keep `python3 scripts/verify.py` dependency-light and free of required PySide, Demucs, CUDA, FAISS, learned-model, cloud-service, or audio-device dependencies.
+
+**Exit criteria:**
+- `uv sync --extra ui --extra demucs` resolves without CUDA/NVIDIA/Triton packages in the default CPU Demucs path.
+- `python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto` records real smoke passes when local dependencies are present and skips only when they are absent.
+- `python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke --run-demucs-smoke --real-smoke-policy required` fails on missing optional dependencies instead of rewriting missing gates as skips.
+- Phase closeout records full verify plus real PySide and real Demucs smoke evidence when the local environment supports them.
+
+**FILE_PLAN ids:** `P12-001` .. `P12-0NN`.
