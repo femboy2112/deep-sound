@@ -14,7 +14,11 @@ from deep_sound.ui.library_workflow import (
     AnalyzeIntentDTO,
     ImportIntentDTO,
     IndexIntentDTO,
+    PauseIntentDTO,
+    PlayIntentDTO,
     SearchIntentDTO,
+    SeekIntentDTO,
+    StopIntentDTO,
 )
 
 
@@ -26,6 +30,14 @@ class MainWindowController(Protocol):
     def build_index(self, intent: IndexIntentDTO) -> object: ...
 
     def search(self, intent: SearchIntentDTO) -> object: ...
+
+    def play(self, intent: PlayIntentDTO) -> object: ...
+
+    def pause(self, intent: PauseIntentDTO) -> object: ...
+
+    def seek(self, intent: SeekIntentDTO) -> object: ...
+
+    def stop(self, intent: StopIntentDTO) -> object: ...
 
     def snapshot(self) -> object: ...
 
@@ -118,6 +130,32 @@ class MainWindowActionBinder:
             SearchIntentDTO(query_id=self.selected_track_id, mode=self.search_mode)
         )
 
+    def play_selected(self, *, start_sec: float = 0.0) -> object | None:
+        if self.selected_track_id is None:
+            return None
+        return self.controller.play(
+            PlayIntentDTO(track_id=self.selected_track_id, start_sec=start_sec)
+        )
+
+    def pause_selected(self, *, position_sec: float = 0.0) -> object | None:
+        if self.selected_track_id is None:
+            return None
+        return self.controller.pause(
+            PauseIntentDTO(track_id=self.selected_track_id, position_sec=position_sec)
+        )
+
+    def seek_selected(self, position_sec: float) -> object | None:
+        if self.selected_track_id is None:
+            return None
+        return self.controller.seek(
+            SeekIntentDTO(track_id=self.selected_track_id, position_sec=position_sec)
+        )
+
+    def stop_selected(self) -> object | None:
+        if self.selected_track_id is None:
+            return None
+        return self.controller.stop(StopIntentDTO(track_id=self.selected_track_id))
+
 
 def library_rows(tracks: Sequence[Track]) -> list[LibraryRow]:
     return [
@@ -199,12 +237,18 @@ def create_main_window(
     reindex_button = QPushButton("Reindex")
     refresh_button = QPushButton("Refresh")
     search_button = QPushButton("Search Selected")
+    play_button = QPushButton("Play")
+    pause_button = QPushButton("Pause")
+    stop_button = QPushButton("Stop")
     toolbar.addWidget(import_file_button)
     toolbar.addWidget(import_folder_button)
     toolbar.addWidget(analyze_button)
     toolbar.addWidget(reindex_button)
     toolbar.addWidget(refresh_button)
     toolbar.addWidget(search_button)
+    toolbar.addWidget(play_button)
+    toolbar.addWidget(pause_button)
+    toolbar.addWidget(stop_button)
     filter_box = QLineEdit()
     filter_box.setPlaceholderText("Filter library")
     toolbar.addWidget(filter_box)
@@ -242,6 +286,18 @@ def create_main_window(
             sync_selection()
             binder.search_selected()
 
+        def play_selected() -> None:
+            sync_selection()
+            binder.play_selected()
+
+        def pause_selected() -> None:
+            sync_selection()
+            binder.pause_selected()
+
+        def stop_selected() -> None:
+            sync_selection()
+            binder.stop_selected()
+
         table.itemSelectionChanged.connect(sync_selection)
         import_file_button.clicked.connect(
             lambda: binder.import_files(
@@ -253,6 +309,9 @@ def create_main_window(
         reindex_button.clicked.connect(binder.build_index)
         refresh_button.clicked.connect(binder.refresh)
         search_button.clicked.connect(search_selected)
+        play_button.clicked.connect(play_selected)
+        pause_button.clicked.connect(pause_selected)
+        stop_button.clicked.connect(stop_selected)
 
     queue_label = QLabel("Analysis Queue")
     layout.addWidget(queue_label)

@@ -124,3 +124,11 @@ The `[demucs]` extra is CPU-only by default. `torch` and `torchaudio` resolve th
 `scripts/live_qa.py --real-smoke-policy auto` runs PySide smoke when PySide is installed and real Demucs smoke when the Demucs executable is installed. `--real-smoke-policy required` converts missing PySide or Demucs into failed gates, and `off` records real-smoke skips even if flags are supplied. Demucs smoke may use a generated fixture; no `/tmp/deep_sound_live_smoke.wav` fixture is required.
 
 GPU/CUDA Demucs support, broader corpus QA, and separation-quality evaluation remain future work.
+
+## 2026-05-20 — Phase 13 real playback transport boundary
+
+Phase 13 promotes playback from inspection-only DTOs to a guarded beta transport. `PlaybackService` remains the dependency-light default; `LocalPlaybackAdapter(audio_output_enabled=True)` is the only path that may open a local audio device, and it requires the optional `[playback]` extra.
+
+The `[playback]` extra adds `sounddevice` only. It must not be folded into default, `[ui]`, `[demucs]`, or required verification dependencies. Missing `sounddevice` or an output-capable device is skipped evidence under `--playback-smoke-policy auto` and a failure only under `required`.
+
+Playback smoke uses generated audio, starts nonblocking playback, stops immediately, and hash-checks the generated fixture. Original imported audio files remain read-only, and device/decode errors are surfaced as `PlaybackState(status=FAILED, error_message=...)` rather than UI exceptions.

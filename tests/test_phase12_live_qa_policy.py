@@ -65,6 +65,8 @@ def test_live_qa_off_policy_skips_requested_real_smoke(
             str(run_dir),
             "--real-smoke-policy",
             "off",
+            "--playback-smoke-policy",
+            "off",
             "--run-pyside-smoke",
             "--run-demucs-smoke",
         ]
@@ -75,6 +77,7 @@ def test_live_qa_off_policy_skips_requested_real_smoke(
     assert {gate["name"]: gate["status"] for gate in payload["optional_gates"]} == {
         "pyside_smoke": "skipped_optional",
         "real_source_smoke": "skipped_optional",
+        "playback_smoke": "skipped_optional",
     }
 
 

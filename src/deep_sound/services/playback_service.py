@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from importlib import import_module
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from deep_sound.domain.track import Track
 
@@ -41,6 +41,21 @@ class PlaybackState:
 class PlaybackRequest:
     track: Track
     position_sec: float = 0.0
+
+
+class PlaybackTransport(Protocol):
+    @property
+    def state(self) -> PlaybackState: ...
+
+    def prepare(self, request: PlaybackRequest) -> PlaybackState: ...
+
+    def play(self, request: PlaybackRequest) -> PlaybackState: ...
+
+    def pause(self) -> PlaybackState: ...
+
+    def seek(self, position_sec: float) -> PlaybackState: ...
+
+    def stop(self) -> PlaybackState: ...
 
 
 class PlaybackService:
@@ -195,21 +210,45 @@ class LocalPlaybackAdapter(PlaybackService):
     def pause(self) -> PlaybackState:
         if self._audio_output_enabled:
             try:
-                sd = import_module("sounddevice")
-                cast(Any, sd).stop()
+                self._stop_audio_output()
             except Exception as exc:
-                self._state = PlaybackState(
-                    track_id=self._state.track_id,
-                    source_path=self._state.source_path,
-                    status=PlaybackStatus.FAILED,
-                    position_sec=self._state.position_sec,
-                    duration_sec=self._state.duration_sec,
-                    backend=self.backend_name,
-                    is_output_active=False,
-                    error_message=str(exc),
-                )
+                self._state = self._failed_state(str(exc))
                 return self._state
         return super().pause()
+
+    def seek(self, position_sec: float) -> PlaybackState:
+        if self._state.track_id is None or self._state.status is PlaybackStatus.FAILED:
+            return self._state
+        was_playing = self._state.status is PlaybackStatus.PLAYING
+        source_path = self._state.source_path
+        state = super().seek(position_sec)
+        if not self._audio_output_enabled or not was_playing or source_path is None:
+            return state
+        try:
+            self._stop_audio_output()
+            self._start_audio_output(source_path, state.position_sec)
+        except Exception as exc:
+            self._state = self._failed_state(str(exc))
+            return self._state
+        self._state = PlaybackState(
+            track_id=state.track_id,
+            source_path=state.source_path,
+            status=PlaybackStatus.PLAYING,
+            position_sec=state.position_sec,
+            duration_sec=state.duration_sec,
+            backend=self.backend_name,
+            is_output_active=True,
+        )
+        return self._state
+
+    def stop(self) -> PlaybackState:
+        if self._audio_output_enabled:
+            try:
+                self._stop_audio_output()
+            except Exception as exc:
+                self._state = self._failed_state(str(exc))
+                return self._state
+        return super().stop()
 
     def _start_audio_output(self, source_path: Path, position_sec: float) -> None:
         sf = import_module("soundfile")
@@ -217,6 +256,22 @@ class LocalPlaybackAdapter(PlaybackService):
         data, sample_rate = sf.read(str(source_path), always_2d=True)
         start_frame = max(0, round(position_sec * sample_rate))
         cast(Any, sd).play(data[start_frame:], sample_rate, blocking=False)
+
+    def _stop_audio_output(self) -> None:
+        sd = import_module("sounddevice")
+        cast(Any, sd).stop()
+
+    def _failed_state(self, error_message: str) -> PlaybackState:
+        return PlaybackState(
+            track_id=self._state.track_id,
+            source_path=self._state.source_path,
+            status=PlaybackStatus.FAILED,
+            position_sec=self._state.position_sec,
+            duration_sec=self._state.duration_sec,
+            backend=self.backend_name,
+            is_output_active=False,
+            error_message=error_message,
+        )
 
 
 def _clamp_position(position_sec: float, duration_sec: float | None) -> float:

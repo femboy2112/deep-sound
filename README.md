@@ -12,7 +12,7 @@ Repo-control-plane docs live in:
 
 ## Status
 
-This repository is in **Phase 12 CPU-only real smoke stabilization**. Phase 12 keeps default verification dependency-light while making installed PySide and installed Demucs smoke tests routine. The `[demucs]` extra resolves Torch and Torchaudio from the CPU-only PyTorch index by default; CUDA/GPU Demucs remains future work.
+This repository is in **Phase 13 real playback transport beta**. Phase 13 keeps default verification dependency-light while adding opt-in local audio playback through the `[playback]` extra. Real device output is never required by `make verify`; PySide, Demucs, playback devices, FAISS, and heavier MIR extras remain explicit live QA gates.
 
 ## Quickstart
 
@@ -27,11 +27,14 @@ uv run deep-sound index-library --library-db /tmp/deep-sound.sqlite --profile se
 # Optional CPU real-source smoke when Demucs is installed intentionally
 uv run deep-sound analyze-library --library-db /tmp/deep-sound-real.sqlite --import-path path/to/audio --profile source_aware_real
 
+# Optional local playback support
+uv sync --extra playback
+
 # Run generated-fixture live QA evidence
 python3 scripts/live_qa.py --fixture-mode generated
 
 # Run installed real-smoke gates automatically, skipping only unavailable extras
-QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto
+QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto
 
 # Run quality gates
 make verify                       # ruff + mypy + pytest

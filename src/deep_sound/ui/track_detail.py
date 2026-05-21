@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
@@ -159,6 +159,11 @@ def create_track_detail_widget(
     source_activity: Sequence[SourceActivityRecord] = (),
     features: Sequence[FeatureView] = (),
     waveform: WaveformPanelData | None = None,
+    playback_state: PlaybackState | None = None,
+    on_play: Callable[[PlaybackActionDTO], object] | None = None,
+    on_pause: Callable[[PlaybackActionDTO], object] | None = None,
+    on_seek: Callable[[PlaybackActionDTO], object] | None = None,
+    on_stop: Callable[[PlaybackActionDTO], object] | None = None,
 ) -> object:
     """Create a PySide track-detail widget from service-level DTOs."""
     try:
@@ -184,11 +189,36 @@ def create_track_detail_widget(
     layout.addWidget(QLabel(f"{title}  |  {track.analysis_status}"))
 
     controls = QHBoxLayout()
-    controls.addWidget(QPushButton("Play"))
-    controls.addWidget(QPushButton("Pause"))
+    playback = playback_controls_data(track, playback_state=playback_state)
+    play_button = QPushButton("Play")
+    pause_button = QPushButton("Pause")
+    seek_button = QPushButton("Seek")
+    stop_button = QPushButton("Stop")
+    if on_play is not None and playback.play_action is not None:
+        play_button.clicked.connect(lambda: on_play(playback.play_action))
+    if on_pause is not None and playback.pause_action is not None:
+        pause_button.clicked.connect(lambda: on_pause(playback.pause_action))
+    if on_seek is not None and playback.seek_action is not None:
+        seek_button.clicked.connect(lambda: on_seek(playback.seek_action))
+    if on_stop is not None and playback.stop_action is not None:
+        stop_button.clicked.connect(lambda: on_stop(playback.stop_action))
+    controls.addWidget(play_button)
+    controls.addWidget(pause_button)
+    controls.addWidget(seek_button)
+    controls.addWidget(stop_button)
     controls.addWidget(QPushButton("Analyze"))
     controls.addWidget(QPushButton("Reanalyze"))
     layout.addLayout(controls)
+    layout.addWidget(
+        QLabel(
+            "Playback "
+            f"{playback.status.value} | backend {playback.backend} | "
+            f"{playback.position_sec:.1f}s/{_format_duration(playback.duration_sec)} | "
+            f"output {'active' if playback.is_output_active else 'inactive'}"
+        )
+    )
+    if playback.error_message:
+        layout.addWidget(QLabel(f"Playback error: {playback.error_message}"))
 
     if waveform is None:
         layout.addWidget(QLabel("Waveform cache unavailable"))

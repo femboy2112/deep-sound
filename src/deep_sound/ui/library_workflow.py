@@ -11,12 +11,19 @@ from uuid import uuid4
 from deep_sound.domain.clip import ClipWindow
 from deep_sound.domain.corrections import ResultFeedbackValue
 from deep_sound.domain.feature_view import FeatureType, OwnerType
+from deep_sound.domain.track import Track
 from deep_sound.infra.storage.sqlite_store import JobRecord, SqliteStore
 from deep_sound.services.correction_service import CorrectionService
 from deep_sound.services.feature_service import FeatureService
 from deep_sound.services.index_service import IndexService, IndexStatus
 from deep_sound.services.library_analysis_service import AnalysisProfile, LibraryAnalysisService
 from deep_sound.services.library_service import LibraryService
+from deep_sound.services.playback_service import (
+    PlaybackRequest,
+    PlaybackService,
+    PlaybackState,
+    PlaybackTransport,
+)
 from deep_sound.services.similarity_service import SearchMode, SimilarityResult, SimilarityService
 from deep_sound.services.waveform_service import (
     ClipWindowDTO,
@@ -77,7 +84,7 @@ class ClipSelectionIntentDTO:
     label: str | None = None
 
 
-PlaybackAction = Literal["play", "pause", "seek"]
+PlaybackAction = Literal["play", "pause", "seek", "stop"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +94,7 @@ class PlaybackIntentDTO:
     filepath: Path
     position_sec: float
     duration_sec: float | None = None
+    state: PlaybackState | None = None
     request_id: str = ""
 
 
@@ -106,6 +114,11 @@ class PauseIntentDTO:
 class SeekIntentDTO:
     track_id: str
     position_sec: float
+
+
+@dataclass(frozen=True, slots=True)
+class StopIntentDTO:
+    track_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +214,7 @@ class WorkflowSnapshotDTO:
     track_count: int = 0
     clip_count: int = 0
     live_qa: LiveQASnapshotMetadataDTO | None = None
+    playback_state: PlaybackState | None = None
 
 
 class DesktopWorkflowController:
@@ -222,6 +236,7 @@ class DesktopWorkflowController:
         similarity_service: SimilarityService | None = None,
         correction_service: CorrectionService | None = None,
         waveform_service: WaveformService | None = None,
+        playback_transport: PlaybackTransport | None = None,
     ) -> None:
         self._store = store
         self._app_data_dir = app_data_dir
@@ -242,6 +257,7 @@ class DesktopWorkflowController:
             index_service=self._index,
         )
         self._waveforms = waveform_service or WaveformService(app_data_dir)
+        self._playback = playback_transport or PlaybackService()
 
     @property
     def active_profile(self) -> AnalysisProfile:
@@ -400,6 +416,17 @@ class DesktopWorkflowController:
             position_sec=intent.position_sec,
         )
 
+    def stop(self, intent: StopIntentDTO) -> PlaybackIntentDTO:
+        return self._playback_intent(
+            action="stop",
+            track_id=intent.track_id,
+            position_sec=0.0,
+        )
+
+    @property
+    def playback_state(self) -> PlaybackState:
+        return self._playback.state
+
     def search(
         self,
         intent: SearchIntentDTO,
@@ -460,6 +487,7 @@ class DesktopWorkflowController:
             warnings=warnings,
             track_count=len(tracks),
             clip_count=clip_count,
+            playback_state=self._playback.state,
             live_qa=LiveQASnapshotMetadataDTO(
                 track_count=len(tracks),
                 clip_count=clip_count,
@@ -467,7 +495,7 @@ class DesktopWorkflowController:
                 failed_job_count=sum(1 for job in jobs if job.status == "failed"),
                 warning_count=len(warnings),
                 index_status_count=len(statuses),
-                playback_intents_supported=("play", "pause", "seek"),
+                playback_intents_supported=("play", "pause", "seek", "stop"),
                 active_profile=self._active_profile.value,
             ),
         )
@@ -481,14 +509,34 @@ class DesktopWorkflowController:
     ) -> PlaybackIntentDTO:
         track = self._store.get_track(track_id)
         position = _clamped_position(position_sec, track.duration_sec)
+        state = self._apply_playback_action(action=action, track=track, position_sec=position)
         return PlaybackIntentDTO(
             action=action,
             track_id=track.id,
             filepath=track.filepath,
             position_sec=position,
             duration_sec=track.duration_sec,
+            state=state,
             request_id=str(uuid4()),
         )
+
+    def _apply_playback_action(
+        self,
+        *,
+        action: PlaybackAction,
+        track: Track,
+        position_sec: float,
+    ) -> PlaybackState:
+        request = PlaybackRequest(track=track, position_sec=position_sec)
+        if action == "play":
+            return self._playback.play(request)
+        if action == "pause":
+            return self._playback.pause()
+        if action == "stop":
+            return self._playback.stop()
+        if self._playback.state.track_id != track.id:
+            self._playback.prepare(request)
+        return self._playback.seek(position_sec)
 
     def _run_store_job(
         self,

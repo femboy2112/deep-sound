@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass, field
+from importlib import import_module
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
@@ -124,6 +125,15 @@ def _write_demucs_smoke_fixture(path: Path) -> None:
         end = min(start + click_len, click.shape[0])
         click[start:end] += 0.35 * envelope[: end - start]
     audio = np.clip(bass + chord + click, -0.9, 0.9).astype(np.float32)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(path, audio, sample_rate)
+
+
+def _write_playback_smoke_fixture(path: Path) -> None:
+    sample_rate = 22_050
+    duration_sec = 0.20
+    t = np.linspace(0.0, duration_sec, int(sample_rate * duration_sec), endpoint=False)
+    audio = (0.05 * np.sin(2.0 * np.pi * 440.0 * t)).astype(np.float32)
     path.parent.mkdir(parents=True, exist_ok=True)
     sf.write(path, audio, sample_rate)
 
@@ -493,6 +503,101 @@ def _optional_demucs_gate(
     )
 
 
+def _playback_output_available() -> bool:
+    if find_spec("sounddevice") is None:
+        return False
+    try:
+        sd = import_module("sounddevice")
+        devices = sd.query_devices()  # type: ignore[attr-defined]
+    except Exception:
+        return False
+    if isinstance(devices, dict):
+        return int(devices.get("max_output_channels", 0)) > 0
+    return any(int(device.get("max_output_channels", 0)) > 0 for device in devices)
+
+
+def _optional_playback_gate(*, run: bool, required: bool, run_dir: Path) -> GateResult:
+    if not run:
+        return GateResult(
+            name="playback_smoke",
+            status="skipped_optional",
+            optional=True,
+            summary="Playback smoke was not requested or no output-capable device was detected.",
+        )
+    if find_spec("sounddevice") is None:
+        status = "failed" if required else "skipped_optional"
+        return GateResult(
+            name="playback_smoke",
+            status=status,
+            optional=True,
+            summary="Playback smoke is required but sounddevice is not installed."
+            if required
+            else "Playback smoke was requested but sounddevice is not installed.",
+        )
+    if not _playback_output_available():
+        status = "failed" if required else "skipped_optional"
+        return GateResult(
+            name="playback_smoke",
+            status=status,
+            optional=True,
+            summary="Playback smoke is required but no output-capable device was detected."
+            if required
+            else "Playback smoke skipped because no output-capable device was detected.",
+        )
+
+    from deep_sound.domain.track import Track
+    from deep_sound.services.playback_service import (
+        LocalPlaybackAdapter,
+        PlaybackRequest,
+        PlaybackStatus,
+    )
+
+    audio_path = run_dir / "fixtures" / "generated_playback_smoke.wav"
+    _write_playback_smoke_fixture(audio_path)
+    before_hash = _sha256_file(audio_path)
+    adapter = LocalPlaybackAdapter(audio_output_enabled=True)
+    try:
+        state = adapter.play(
+            PlaybackRequest(
+                Track(id="playback-smoke", filepath=audio_path, duration_sec=0.20),
+                position_sec=0.0,
+            )
+        )
+        stopped = adapter.stop()
+    except Exception as exc:
+        return GateResult(
+            name="playback_smoke",
+            status="failed",
+            optional=True,
+            summary="Playback smoke raised an unexpected error.",
+            details={"error": str(exc), "audio_path": str(audio_path)},
+        )
+    after_hash = _sha256_file(audio_path)
+    passed = (
+        state.status is PlaybackStatus.PLAYING
+        and state.is_output_active
+        and stopped.status is PlaybackStatus.STOPPED
+        and before_hash == after_hash
+    )
+    return GateResult(
+        name="playback_smoke",
+        status="passed" if passed else "failed",
+        optional=True,
+        summary="Generated audio played nonblocking and stopped immediately."
+        if passed
+        else "Generated audio playback failed or modified the fixture.",
+        details={
+            "audio_path": str(audio_path),
+            "backend": state.backend,
+            "play_status": state.status.value,
+            "stop_status": stopped.status.value,
+            "output_active": state.is_output_active,
+            "fixture_unchanged": before_hash == after_hash,
+            "error": state.error_message,
+        },
+    )
+
+
 def _report_overall(required: list[GateResult], optional: list[GateResult]) -> str:
     failures = [gate for gate in (*required, *optional) if gate.status == "failed"]
     return "fail" if failures else "pass"
@@ -579,6 +684,20 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Opt in to the optional real Demucs source-aware smoke.",
     )
     parser.add_argument(
+        "--run-playback-smoke",
+        action="store_true",
+        help="Opt in to the optional real local playback smoke.",
+    )
+    parser.add_argument(
+        "--playback-smoke-policy",
+        choices=("auto", "required", "off"),
+        default="auto",
+        help=(
+            "Playback smoke policy: auto runs only when sounddevice and an output-capable "
+            "environment are available, required fails when unavailable, off records a skip."
+        ),
+    )
+    parser.add_argument(
         "--demucs-audio",
         type=Path,
         default=None,
@@ -643,6 +762,20 @@ def main(argv: list[str] | None = None) -> int:
             run_dir=run_dir,
         ),
     ]
+    required_playback_smoke = args.playback_smoke_policy == "required"
+    if args.playback_smoke_policy == "off":
+        run_playback_smoke = False
+    elif required_playback_smoke:
+        run_playback_smoke = True
+    else:
+        run_playback_smoke = args.run_playback_smoke or _playback_output_available()
+    optional.append(
+        _optional_playback_gate(
+            run=run_playback_smoke,
+            required=required_playback_smoke,
+            run_dir=run_dir,
+        )
+    )
     overall = _report_overall(required, optional)
     report = LiveQAReport(
         timestamp=_utc_timestamp(),

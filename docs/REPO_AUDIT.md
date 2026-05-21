@@ -1,13 +1,14 @@
 # Repo Audit
 
-This audit inventories the Deep-Sound repository during the Phase 12 CPU-only real smoke stabilization pass on 2026-05-20. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
+This audit inventories the Deep-Sound repository during the Phase 13 real playback transport beta pass on 2026-05-20. It is repo-wide and includes product code, tests, orchestration surfaces, and governance docs.
 
 ## Executive Summary
 
-- `ACTIVE_PHASE: 12`; Phase 12 rows define the CPU-only optional dependency and real-smoke closeout boundary.
+- `ACTIVE_PHASE: 13`; Phase 13 rows define the optional playback dependency, controller/UI transport, and live playback smoke boundary.
 - The runtime now covers a dependency-light desktop beta seam plus interactive wiring DTOs: app/session config, import/analyze/index/search/waveform/clip/feedback controller intents, index/job snapshots, hydrated result cards, source detail DTOs, selected-track waveform/clip state, clip-owned features, and optional PySide widget factories.
 - `source_aware` remains the fake-provider route; `source_aware_real` is the explicit Demucs-backed opt-in path.
-- `scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto` records required generated-fixture workflow evidence and runs installed PySide/Demucs smoke when available.
+- `scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto` records required generated-fixture workflow evidence and runs installed PySide/Demucs/playback smoke when available.
+- The `[playback]` extra adds `sounddevice` for explicitly enabled local output; default verification does not open audio devices.
 - The `[demucs]` extra now pins `torch` and `torchaudio` to uv's explicit `pytorch-cpu` index. CUDA/NVIDIA/Triton packages are not part of the default CPU Demucs path.
 - Core verification remains intentionally light: no required FAISS, PySide, Demucs, learned embeddings, cloud services, packaging installers, or heavy MIR extras.
 - Search and MIR-facing outputs continue to expose confidence/caveats instead of definitive labels.
@@ -15,7 +16,7 @@ This audit inventories the Deep-Sound repository during the Phase 12 CPU-only re
 
 ## Risk Summary
 
-- Product/runtime risk: medium. The beta workflow is usable through CLI/service seams and controller-backed UI actions, but playback transport, commercial packaging, and production-quality MIR models remain future work.
+- Product/runtime risk: medium. The beta workflow is usable through CLI/service seams and controller-backed UI actions, and playback has a guarded beta transport; commercial packaging and production-quality MIR models remain future work.
 - Spec-drift risk: medium. Phases 7 through 9 are repo-local build-plan scopes layered on top of the spec; their acceptance boundaries are documented in `docs/build/PHASES.md` and `docs/build/DECISIONS.md`.
 - Dependency risk: low for default gates. Optional FAISS/PySide/Demucs paths remain isolated, and default Demucs resolution is CPU-only.
 - Data lifecycle risk: medium. Feature reruns are now idempotent for canonical views, but richer migration/retention policy is still future work.
@@ -35,7 +36,8 @@ This audit inventories the Deep-Sound repository during the Phase 12 CPU-only re
 | CLI workflow | Active | `analyze-library --profile`, `index-library --profile`, and `search-library --show-titles --explain` cover the beta path; `--profile source_aware_real` is the opt-in real-source smoke route. |
 | Clip/window | Active | `ClipWindow`, SQLite `clip_windows`, and `ClipAnalysisService` support clip-owned rhythm/harmony/timbre feature rows under app data. |
 | Waveform/cache | DTO/service seam | `WaveformService` writes JSON peak/RMS cache artifacts without PySide. |
-| UI workflow | Interactive beta seam | `ui/library_workflow.py` maps import/analyze/index/search/progress/warnings/results/waveform/clip/feedback DTOs without importing PySide; `ui/main_window.py` adds controller-backed action binding. |
+| UI workflow | Interactive beta seam | `ui/library_workflow.py` maps import/analyze/index/search/progress/warnings/results/waveform/clip/feedback/playback DTOs without importing PySide; `ui/main_window.py` adds controller-backed action binding. |
+| Playback | Beta transport | `PlaybackService` stays inspection-safe by default; `LocalPlaybackAdapter(audio_output_enabled=True)` uses `soundfile`/`sounddevice`, clamps seeks, stops output, and reports device/decode errors as failed state. |
 | Desktop settings | Active | `ui/session_config.py` persists library DB, app data dir, active profile, and last query state. |
 | Result inspection | Active | Result cards retain backend, stale-index warnings, caveats, dimension scores, preview/compare metadata, and feedback action intents. |
 | Source detail | Active | Source graph/detail DTOs expose confidence, compatible source search actions, correction gating, and correction metadata. |
@@ -79,6 +81,17 @@ This audit inventories the Deep-Sound repository during the Phase 12 CPU-only re
 | `tests/test_phase12_live_qa_policy.py` | Focused policy coverage for auto, required, and off modes. |
 | `tests/test_phase12_optional_extra_resolution.py` | Lockfile/config guard against CUDA/NVIDIA/Triton packages in the CPU Demucs path. |
 
+## Key Files Added Or Advanced In Phase 13
+
+| Path | Purpose |
+|---|---|
+| `pyproject.toml` / `uv.lock` | Optional `[playback]` extra for `sounddevice`, excluded from default, `[ui]`, and `[demucs]`. |
+| `src/deep_sound/services/playback_service.py` | Import-safe `PlaybackTransport` protocol plus real local output stop/seek/error handling. |
+| `src/deep_sound/ui/library_workflow.py` | Controller playback transport routing, stop intent, and snapshot playback state. |
+| `src/deep_sound/ui/track_detail.py` / `src/deep_sound/ui/main_window.py` | PySide playback buttons and state display routed through controller callbacks. |
+| `scripts/live_qa.py` | `--run-playback-smoke` plus `--playback-smoke-policy auto|required|off`. |
+| `tests/test_phase13_*.py` | Focused playback service, controller, PySide control, live QA policy, and opt-in real playback smoke coverage. |
+
 ## Governance And Control Plane
 
 | Path | Status | Notes |
@@ -88,27 +101,27 @@ This audit inventories the Deep-Sound repository during the Phase 12 CPU-only re
 | `.codex/CODEX_AGENT_MAP.md` | Active | Role/delegation map used by current runs. |
 | `.claude/` | Active | Claude-oriented commands/agents/hooks remain available. |
 | `docs/AGENT_HARNESS_SPEC.md` | Active | Shared control-plane contract. |
-| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 12 CPU real-smoke boundary. |
+| `docs/build/PHASES.md` | Active | Current phase ceiling and Phase 13 real playback transport boundary. |
 | `docs/build/FILE_PLAN.md` | Active | Mutated only through `scripts/update_plan.py`. |
-| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 12. |
-| `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 12 closeout is current when P12-009 completes. |
+| `docs/build/DECISIONS.md` | Active | Records dependency-light phase boundaries through Phase 13. |
+| `docs/build/BUILD_LOG.md` | Active | Append-only build history; Phase 13 closeout is current when P13-010 completes. |
 | `scripts/toolset_review.py` | Active | Suggest-only review; no auto-edits. |
 
 ## Manual QA Checklist
 
-See `docs/desktop_beta_manual_qa.md` for the Phase 12 desktop beta checklist. It covers generated-fixture live QA evidence, service workflow, waveform/clip state, clip-owned feature materialization, result/source actions, feedback, optional PySide smoke steps, and CPU real-Demucs smoke steps.
+See `docs/desktop_beta_manual_qa.md` for the Phase 13 desktop beta checklist. It covers generated-fixture live QA evidence, service workflow, waveform/clip state, clip-owned feature materialization, result/source actions, feedback, optional PySide smoke steps, CPU real-Demucs smoke steps, and optional playback smoke steps.
 
 ## Remaining Gaps
 
 - Source-aware acceptance uses fake copied stems for default verification. CPU real separation is smoke-testable through `source_aware_real`, but GPU acceleration, quality tuning, and broad corpus validation remain future work.
-- Playback transport remains a UI placeholder.
+- Playback transport is beta-grade and guarded; broader UX polish, device selection, and packaging remain future work.
 - The live QA harness proves generated-fixture workflow repeatability; broader human-curated corpus quality remains manual beta evidence.
 - `scripts/toolset_review.py` is intentionally shallow and suggest-only; it should not be treated as a complete governance audit.
 
 ## Closeout Checks
 
 - `python3 scripts/verify.py`
-- `python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto`
-- `QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke --run-demucs-smoke --real-smoke-policy required`
+- `python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy auto --playback-smoke-policy auto`
+- `QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke --run-demucs-smoke --run-playback-smoke --real-smoke-policy required --playback-smoke-policy required`
 - `python3 scripts/status.py`
 - `python3 scripts/toolset_review.py`

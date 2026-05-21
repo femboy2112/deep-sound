@@ -92,7 +92,7 @@ def test_controller_snapshot_includes_live_qa_metadata(
     assert snapshot.live_qa.failed_job_count == 1
     assert snapshot.live_qa.warning_count == 0
     assert snapshot.live_qa.index_status_count == len(snapshot.index_statuses)
-    assert snapshot.live_qa.playback_intents_supported == ("play", "pause", "seek")
+    assert snapshot.live_qa.playback_intents_supported == ("play", "pause", "seek", "stop")
     assert snapshot.live_qa.active_profile == "searchable"
 
 

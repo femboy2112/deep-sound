@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 12
+**ACTIVE_PHASE:** 13
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -229,3 +229,23 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - Phase closeout records full verify plus real PySide and real Demucs smoke evidence when the local environment supports them.
 
 **FILE_PLAN ids:** `P12-001` .. `P12-0NN`.
+
+---
+
+## Phase 13 — Real Playback Transport Beta
+
+**Goal:** Replace placeholder playback inspection with a guarded local playback path for imported tracks, while preserving dependency-light default verification.
+
+**Required capabilities:**
+- Keep playback output disabled by default; real device output is available only with the `[playback]` extra and explicit opt-in.
+- Route play, pause, stop, and seek through import-safe service/controller seams that expose inspectable `PlaybackState`.
+- Clamp seek positions, stop local device output safely, and surface decode/device failures as failed playback state instead of uncaught UI errors.
+- Wire track-detail and main-window playback controls without requiring PySide at import time.
+- Add live QA playback smoke policy with `auto|required|off`, generated audio, immediate stop, and original-audio immutability.
+
+**Exit criteria:**
+- `python3 scripts/verify.py` remains green without audio device access.
+- `python3 scripts/live_qa.py --fixture-mode generated --playback-smoke-policy auto` records playback smoke as pass or skipped optional evidence.
+- `DEEP_SOUND_RUN_PLAYBACK_SMOKE=1 uv run pytest tests/test_phase13_live_playback_smoke.py -vv` is available as an explicit real-device smoke.
+
+**FILE_PLAN ids:** `P13-001` .. `P13-0NN`.

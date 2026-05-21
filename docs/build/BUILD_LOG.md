@@ -4,6 +4,36 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 13 real playback transport beta
+
+- **Agent:** Codex
+- **Scope:** Open Phase 13, add optional real local playback transport, and preserve dependency-light default verification.
+- **Rows touched:** P13-001 .. P13-010.
+- **Changes:**
+  - Promoted `ACTIVE_PHASE` to 13 and documented the real playback transport boundary.
+  - Added the `[playback]` extra for `sounddevice` without making it part of default, `[ui]`, or `[demucs]`.
+  - Added an import-safe `PlaybackTransport` protocol, real `LocalPlaybackAdapter` stop/seek/error handling, and controller playback state routing including stop intents.
+  - Wired main-window and track-detail playback buttons through controller callbacks while keeping PySide optional at import time.
+  - Added `scripts/live_qa.py --run-playback-smoke` and `--playback-smoke-policy auto|required|off` with generated audio and immediate stop.
+  - Added Phase 13 focused tests for playback service, controller state, PySide controls, live QA playback policy, and opt-in real playback smoke.
+- **Verification:**
+  - `env UV_CACHE_DIR=/tmp/uv-cache uv lock`
+  - `env UV_CACHE_DIR=/tmp/uv-cache uv sync --extra ui --extra playback`
+  - `env UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_phase13_playback_service.py tests/test_phase13_controller_playback.py tests/test_phase13_live_qa_playback_policy.py -q`
+  - `env UV_CACHE_DIR=/tmp/uv-cache QT_QPA_PLATFORM=offscreen uv run pytest tests/test_phase13_pyside_playback_controls.py -q`
+  - `env UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_phase13_live_playback_smoke.py -q`
+  - `python3 scripts/live_qa.py --fixture-mode generated --real-smoke-policy off --playback-smoke-policy auto`
+  - `python3 scripts/live_qa.py --fixture-mode generated --playback-smoke-policy auto`
+  - `python3 scripts/toolset_review.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/verify.py`
+- **Notes:**
+  - Default verification remains free of required audio-device access.
+  - Playback smoke passed in `auto` mode on this host after installing `[playback]`.
+  - Required playback smoke is expected to fail on hosts without `sounddevice` or output-capable devices; use `auto` for routine dependency-light live QA.
+
+---
+
 ## 2026-05-20 — Phase 12 CPU-only real smoke stabilization
 
 - **Agent:** Codex
