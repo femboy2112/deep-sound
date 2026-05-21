@@ -104,3 +104,13 @@ Phase 10 adds an explicit real-source smoke path without changing the default so
 Missing Demucs is treated as a clear opt-in failure for `source_aware_real`, not as a reason for default `python3 scripts/verify.py` to fail. Optional real-Demucs smoke tests skip unless a Demucs executable and local audio fixture are intentionally provided.
 
 Real separated stems must be copied under app data, original audio files must remain unchanged, and stem records must persist algorithm, model, params hash, and input hash provenance before downstream stem/source analyzers run.
+
+## 2026-05-20 — Phase 11 live beta QA boundary
+
+Phase 11 promotes live beta validation as a repeatable evidence loop, not as a new default dependency set. The required gate remains `python3 scripts/verify.py`; live corpus, real Demucs, PySide, audio-device playback, FAISS, learned models, and cloud-backed services stay opt-in.
+
+The live QA harness must write `.build/live_qa_report.json` and `.build/live_qa_report.md` with pass, fail, and skipped-optional states separated. A missing optional dependency is evidence to record, not a hidden success. A requested live gate that runs and fails must remain a failure with enough command and artifact context to reproduce.
+
+Playback work in this phase is limited to import-safe inspection seams and UI/controller action DTOs. It must not require PySide or a local audio output device during default tests, and it must never mutate original audio files.
+
+`python3 scripts/live_qa.py --fixture-mode generated` is the dependency-light live evidence command. It may create generated fixtures, a temporary library database, indexes, waveform caches, clip artifacts, and report files under `.build/`, but it must hash-check the generated original fixtures and keep workflow artifacts under the configured app data directory. PySide and real-Demucs live gates are opt-in flags and remain visible as separate optional outcomes.

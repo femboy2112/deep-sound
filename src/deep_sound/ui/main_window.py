@@ -157,8 +157,8 @@ def create_main_window(
     Importing this module does not require PySide. Calling this factory does.
     """
     try:
-        from PySide6.QtCore import Qt  # type: ignore[import-not-found]
-        from PySide6.QtWidgets import (  # type: ignore[import-not-found]
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import (
             QAbstractItemView,
             QFileDialog,
             QHBoxLayout,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from deep_sound.domain.feature_view import FeatureType, OwnerType
 from deep_sound.domain.source import SourceType
@@ -259,7 +259,8 @@ def create_query_builder_widget(weights: QueryWeights | None = None) -> object:
     and instrument behavior search is outside Phase 1.
     """
     try:
-        from PySide6.QtWidgets import (  # type: ignore[import-not-found]
+        from PySide6.QtGui import QStandardItemModel
+        from PySide6.QtWidgets import (
             QCheckBox,
             QComboBox,
             QFormLayout,
@@ -282,8 +283,9 @@ def create_query_builder_widget(weights: QueryWeights | None = None) -> object:
     target.addItems(["Whole track", "Selected clip", "Selected section"])
     target.addItem("Selected stem")
     target.addItem("Selected source")
-    target.model().item(3).setEnabled(False)
-    target.model().item(4).setEnabled(False)
+    target_model = cast(QStandardItemModel, target.model())
+    target_model.item(3).setEnabled(False)
+    target_model.item(4).setEnabled(False)
     layout.addWidget(target)
 
     current = weights or QueryWeights()

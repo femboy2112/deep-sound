@@ -64,7 +64,7 @@ def waveform_panel_data(
 def create_waveform_panel(data: WaveformPanelData) -> object:
     """Create a simple PySide waveform panel from import-safe DTOs."""
     try:
-        from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget  # type: ignore[import-not-found]
+        from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError(
             "Install deep-sound with the [ui] extra to create PySide widgets."

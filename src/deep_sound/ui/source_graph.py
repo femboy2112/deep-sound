@@ -131,7 +131,7 @@ def _compatible_search_modes(source_type: SourceType) -> tuple[str, ...]:
 def create_source_graph_view(graph: SourceGraph) -> object:
     """Create a PySide source graph list from broad-stem DTOs."""
     try:
-        from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget  # type: ignore[import-not-found]
+        from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError(
             "Install deep-sound with the [ui] extra to create PySide widgets."

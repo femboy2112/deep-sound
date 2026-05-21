@@ -73,7 +73,7 @@ def create_desktop_app_window(
     """
 
     try:
-        from PySide6.QtWidgets import QApplication  # type: ignore[import-not-found]
+        from PySide6.QtWidgets import QApplication
     except ImportError as exc:  # pragma: no cover - exercised only with optional extra absent.
         raise RuntimeError(
             "Install deep-sound with the [ui] extra to create the desktop app window."

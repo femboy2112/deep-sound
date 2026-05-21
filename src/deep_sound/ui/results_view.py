@@ -125,7 +125,7 @@ def _feedback_intent(
 def create_results_view(cards: Sequence[ResultCardData]) -> object:
     """Create a PySide results list from result-card DTOs."""
     try:
-        from PySide6.QtWidgets import (  # type: ignore[import-not-found]
+        from PySide6.QtWidgets import (
             QFrame,
             QHBoxLayout,
             QLabel,

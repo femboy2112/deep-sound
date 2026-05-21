@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
+from typing import Literal, TypeVar
 from uuid import uuid4
 
 from deep_sound.domain.clip import ClipWindow
@@ -75,6 +75,37 @@ class ClipSelectionIntentDTO:
     start_sec: float
     end_sec: float
     label: str | None = None
+
+
+PlaybackAction = Literal["play", "pause", "seek"]
+
+
+@dataclass(frozen=True, slots=True)
+class PlaybackIntentDTO:
+    action: PlaybackAction
+    track_id: str
+    filepath: Path
+    position_sec: float
+    duration_sec: float | None = None
+    request_id: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class PlayIntentDTO:
+    track_id: str
+    start_sec: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class PauseIntentDTO:
+    track_id: str
+    position_sec: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class SeekIntentDTO:
+    track_id: str
+    position_sec: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +181,18 @@ class WorkflowWarningDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class LiveQASnapshotMetadataDTO:
+    track_count: int
+    clip_count: int
+    job_count: int
+    failed_job_count: int
+    warning_count: int
+    index_status_count: int
+    playback_intents_supported: tuple[PlaybackAction, ...]
+    active_profile: str
+
+
+@dataclass(frozen=True, slots=True)
 class WorkflowSnapshotDTO:
     active_profile: AnalysisProfile
     jobs: tuple[WorkflowJobDTO, ...] = ()
@@ -157,6 +200,7 @@ class WorkflowSnapshotDTO:
     warnings: tuple[WorkflowWarningDTO, ...] = ()
     track_count: int = 0
     clip_count: int = 0
+    live_qa: LiveQASnapshotMetadataDTO | None = None
 
 
 class DesktopWorkflowController:
@@ -335,6 +379,27 @@ class DesktopWorkflowController:
             label=clip.label,
         )
 
+    def play(self, intent: PlayIntentDTO) -> PlaybackIntentDTO:
+        return self._playback_intent(
+            action="play",
+            track_id=intent.track_id,
+            position_sec=intent.start_sec,
+        )
+
+    def pause(self, intent: PauseIntentDTO) -> PlaybackIntentDTO:
+        return self._playback_intent(
+            action="pause",
+            track_id=intent.track_id,
+            position_sec=intent.position_sec,
+        )
+
+    def seek(self, intent: SeekIntentDTO) -> PlaybackIntentDTO:
+        return self._playback_intent(
+            action="seek",
+            track_id=intent.track_id,
+            position_sec=intent.position_sec,
+        )
+
     def search(
         self,
         intent: SearchIntentDTO,
@@ -385,15 +450,44 @@ class DesktopWorkflowController:
             for owner_type, feature_type in self._profile_features()
         )
         tracks = self._store.list_tracks()
+        jobs = tuple(job_dto(job) for job in self._store.list_jobs())
+        warnings = stale_index_warnings(statuses)
+        clip_count = sum(len(self._store.list_clip_windows_for_track(track.id)) for track in tracks)
         return WorkflowSnapshotDTO(
             active_profile=self._active_profile,
-            jobs=tuple(job_dto(job) for job in self._store.list_jobs()),
+            jobs=jobs,
             index_statuses=tuple(index_status_dto(status) for status in statuses),
-            warnings=stale_index_warnings(statuses),
+            warnings=warnings,
             track_count=len(tracks),
-            clip_count=sum(
-                len(self._store.list_clip_windows_for_track(track.id)) for track in tracks
+            clip_count=clip_count,
+            live_qa=LiveQASnapshotMetadataDTO(
+                track_count=len(tracks),
+                clip_count=clip_count,
+                job_count=len(jobs),
+                failed_job_count=sum(1 for job in jobs if job.status == "failed"),
+                warning_count=len(warnings),
+                index_status_count=len(statuses),
+                playback_intents_supported=("play", "pause", "seek"),
+                active_profile=self._active_profile.value,
             ),
+        )
+
+    def _playback_intent(
+        self,
+        *,
+        action: PlaybackAction,
+        track_id: str,
+        position_sec: float,
+    ) -> PlaybackIntentDTO:
+        track = self._store.get_track(track_id)
+        position = _clamped_position(position_sec, track.duration_sec)
+        return PlaybackIntentDTO(
+            action=action,
+            track_id=track.id,
+            filepath=track.filepath,
+            position_sec=position,
+            duration_sec=track.duration_sec,
+            request_id=str(uuid4()),
         )
 
     def _run_store_job(
@@ -616,6 +710,13 @@ def _weights_for_search_mode(mode: SearchMode, weights: QueryWeights) -> dict[st
     if mode is SearchMode.WEIGHTED:
         return weights.normalized_phase5_weights()
     return {mode.value: 1.0}
+
+
+def _clamped_position(position_sec: float, duration_sec: float | None) -> float:
+    position = max(0.0, position_sec)
+    if duration_sec is None:
+        return position
+    return min(position, duration_sec)
 
 
 def _desktop_result_explanation(result: SimilarityResult) -> str:

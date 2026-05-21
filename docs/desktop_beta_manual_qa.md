@@ -1,13 +1,26 @@
 # Desktop Beta Manual QA
 
-Use this checklist for Phase 10 local desktop beta QA. Default automated verification stays dependency-light; PySide and real-Demucs checks are manual or skipped unless the optional extras are installed intentionally.
+Use this checklist for Phase 11 local desktop beta QA. Default automated verification stays dependency-light; live PySide, real-Demucs, and local audio-device checks are explicit opt-in gates and must be logged separately from required generated-fixture evidence.
 
 ## Setup
 
 1. Prepare a tiny local audio folder with at least two valid audio files and one intentionally broken `.wav` text file.
 2. Run `make bootstrap` if dependencies are missing.
-3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 10`.
+3. Run `python3 scripts/status.py` and confirm `ACTIVE_PHASE: 11`.
 4. Use a fresh library database, for example `/tmp/deep-sound-desktop-beta.sqlite`, and an app data directory under `/tmp/deep-sound-desktop-beta-data`.
+
+## Live QA Harness
+
+1. Run the dependency-light generated fixture gate:
+
+   ```bash
+   python3 scripts/live_qa.py --fixture-mode generated
+   ```
+
+2. Confirm `.build/live_qa_report.json` and `.build/live_qa_report.md` exist.
+3. Confirm required gates are `passed`: import, analysis, index, search, waveform, clip, feedback, and artifact safety.
+4. Confirm optional gates are listed separately as `skipped_optional` unless intentionally requested.
+5. If an optional gate is requested and fails, keep the failure in the report with the command, fixture, and artifact context needed to reproduce it. Do not rewrite the failure as a skip.
 
 ## Service Workflow
 
@@ -22,7 +35,7 @@ Use this checklist for Phase 10 local desktop beta QA. Default automated verific
 
 ## Interactive PySide Smoke
 
-Only run this section after installing the `[ui]` extra.
+Only run this section after installing the `[ui]` extra. For harness evidence, request it explicitly with `python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke`.
 
 1. Create the desktop app window with a fresh database and confirm the main-window import, analyze, reindex, refresh, and selected-track search buttons route through the injected controller.
 2. Select a track row, build a waveform cache, and confirm the track-detail panel shows selected-track state plus waveform or an explicit cache-unavailable message.
@@ -50,12 +63,21 @@ Only run this section after intentionally installing the `[demucs]` extra or oth
 
 4. Confirm stems are written below `/tmp/deep-sound-real-source-data/stems/`, original audio bytes are unchanged, and persisted stem metadata reports `demucs` with model/version/params/input provenance.
 5. Run the same command with an intentionally missing `--demucs-executable` and confirm the CLI fails with a clear `source_aware_real` opt-in error.
+6. For harness evidence, request the optional gate explicitly:
+
+   ```bash
+   python3 scripts/live_qa.py \
+     --fixture-mode generated \
+     --run-demucs-smoke \
+     --demucs-audio /path/to/tiny.wav
+   ```
 
 ## Known Gaps
 
 - Playback transport controls are still UI placeholders.
 - Default verification does not exercise a real installed PySide session unless `[ui]` is installed locally.
 - Default `source_aware` QA still uses fake-provider source paths. Real separation QA uses only the explicit `source_aware_real` path.
+- Optional live gate skips are expected when dependencies or fixtures are absent, but requested gate failures must remain visible in `.build/live_qa_report.*`.
 
 ## Non-Goals
 

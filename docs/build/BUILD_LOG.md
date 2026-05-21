@@ -4,6 +4,31 @@ Append-only journal of build sessions. Newest entries at the top.
 
 ---
 
+## 2026-05-20 — Phase 11 live beta QA hardening
+
+- **Agent:** Codex
+- **Scope:** Open Phase 11 and add repeatable live beta QA evidence.
+- **Rows touched:** P11-001 .. P11-012.
+- **Changes:**
+  - Promoted `ACTIVE_PHASE` to 11 and documented the live beta QA boundary in phase and decision docs.
+  - Added `scripts/live_qa.py`, a generated-fixture harness that records required import/analyze/index/search/waveform/clip/feedback/artifact-safety gates plus optional Demucs/PySide skip or failure evidence in `.build/live_qa_report.{json,md}`.
+  - Added an import-safe playback service seam plus track-detail and controller playback intent DTOs.
+  - Added Phase 11 focused tests for playback, track-detail playback controls, controller live metadata, generated live QA reports, live searchable workflow, optional real-Demucs smoke, and optional PySide smoke.
+  - Refreshed README, manual QA, repo audit, and decisions for the Phase 11 live evidence standard.
+- **Verification:**
+  - `uv run pytest tests/test_phase11_playback_service.py tests/test_phase11_track_detail_playback.py tests/test_phase9_track_detail.py tests/test_phase11_controller_live_workflow.py tests/test_phase9_acceptance_controller.py tests/test_phase11_live_qa_script.py tests/test_phase11_live_searchable_workflow.py tests/test_phase11_live_demucs_workflow.py tests/test_phase11_optional_pyside_live_smoke.py`
+  - `python3 scripts/live_qa.py --fixture-mode generated`
+  - `DEEP_SOUND_RUN_DEMUCS_SMOKE=1 DEEP_SOUND_DEMUCS_EXECUTABLE=/home/leah/ds/deep-sound/.venv/bin/demucs DEEP_SOUND_DEMUCS_SMOKE_AUDIO=/tmp/deep_sound_live_smoke.wav uv run pytest tests/test_phase11_live_demucs_workflow.py -vv`
+  - `QT_QPA_PLATFORM=offscreen python3 scripts/live_qa.py --fixture-mode generated --run-pyside-smoke`
+  - `python3 scripts/verify.py`
+  - `python3 scripts/status.py`
+  - `python3 scripts/toolset_review.py`
+- **Notes:**
+  - Real Demucs smoke passed with the local executable and fixture before the later UI-extra sync pruned the Demucs environment.
+  - PySide was installed and the offscreen live QA PySide app/window smoke passed.
+
+---
+
 ## 2026-05-20 — Phase 10 optional real-source smoke
 
 - **Agent:** Codex

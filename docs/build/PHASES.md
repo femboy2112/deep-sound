@@ -1,6 +1,6 @@
 # Build Phases
 
-**ACTIVE_PHASE:** 10
+**ACTIVE_PHASE:** 11
 
 The line above is the build ceiling. Pickers and gating scripts read it literally. Promote it via `/phase <n>` once a phase's exit criteria are met.
 
@@ -186,3 +186,24 @@ The line above is the build ceiling. Pickers and gating scripts read it literall
 - Focused Phase 10 tests cover missing-Demucs errors, fake-provider compatibility, real-provider routing through a fake executable, artifact placement, and optional smoke skip behavior.
 
 **FILE_PLAN ids:** `P10-001` .. `P10-0NN`.
+
+---
+
+## Phase 11 — Live Beta QA Hardening
+
+**Goal:** Make real-user beta validation repeatable before packaging or deeper MIR quality work.
+
+**Required capabilities:**
+- Run a repo-local live QA harness against a small real-audio corpus or generated fixture set.
+- Capture import, analysis, indexing, search, waveform, clip, feedback, source-aware real smoke, and optional PySide smoke evidence in `.build/live_qa_report.{json,md}`.
+- Keep default verification dependency-light; Demucs, PySide, FAISS, learned models, cloud services, and audio devices remain explicit opt-in live gates.
+- Surface live gate failures as actionable evidence, with skipped optional gates distinguished from passes and failures.
+- Preserve source, chord, event, result, and playback inspection language as confidence-aware and caveated.
+- Keep original audio read-only and all generated app artifacts under the configured app data directory.
+
+**Exit criteria:**
+- `python3 scripts/verify.py` remains green without optional heavy extras.
+- `python3 scripts/live_qa.py --fixture-mode generated` writes a live QA report with passed required gates and explicit optional-skip entries.
+- Manual QA docs, repo audit, decisions, and build log describe the live beta evidence standard and known-failure logging expectations.
+
+**FILE_PLAN ids:** `P11-001` .. `P11-0NN`.
